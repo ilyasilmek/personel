@@ -52,7 +52,7 @@ if %errorlevel% neq 0 (
 echo.
 echo [3/3] Windows Masaustu .EXE dosyasi olusturuluyor...
 echo Lutfen bekleyiniz, bu islem birkac dakika surebilir...
-call npx --yes electron-packager . "TCDD_Personel_Yonetim" --platform=win32 --arch=x64 --out=dist_exe --overwrite --prune=true
+call npx --yes @electron/packager . "TCDD_Personel_Yonetim" --platform=win32 --arch=x64 --out=dist_exe --overwrite --prune=true --electron-version=34.0.0
 
 if %errorlevel% neq 0 (
     color 0c

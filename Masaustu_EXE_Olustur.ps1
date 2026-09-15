@@ -23,7 +23,7 @@ npm run build
 
 Write-Host ""
 Write-Host "[3/3] Windows Masaustu .EXE dosyasi olusturuluyor..." -ForegroundColor Green
-npx --yes electron-packager . "TCDD_Personel_Yonetim" --platform=win32 --arch=x64 --out=dist_exe --overwrite --prune=true
+npx --yes @electron/packager . "TCDD_Personel_Yonetim" --platform=win32 --arch=x64 --out=dist_exe --overwrite --prune=true --electron-version=34.0.0
 
 Write-Host ""
 Write-Host "========================================================" -ForegroundColor Cyan
