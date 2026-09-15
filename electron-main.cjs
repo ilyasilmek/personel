@@ -13,7 +13,7 @@ function createWindow() {
     },
   });
 
-  const distPath = path.join(__dirname, '../dist/index.html');
+  const distPath = path.join(__dirname, 'dist/index.html');
   win.loadFile(distPath).catch(() => {
     win.loadURL('http://localhost:3000');
   });

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="100" fill="#0f2b5c"/>
+  <!-- Train Front / Railway Emblem -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#e02424" stroke-width="16"/>
+  <circle cx="256" cy="256" r="150" fill="#ffffff"/>
+  
+  <!-- Rails & Wing Symbol -->
+  <path d="M156 310 L356 310 L336 340 L176 340 Z" fill="#333333"/>
+  <path d="M180 345 L332 345 L320 365 L192 365 Z" fill="#666666"/>
+  <circle cx="200" cy="275" r="16" fill="#e02424"/>
+  <circle cx="312" cy="275" r="16" fill="#e02424"/>
+  
+  <!-- Locomotive Cab / Window -->
+  <path d="M190 200 Q256 165 322 200 L322 245 L190 245 Z" fill="#0f2b5c"/>
+  <path d="M205 210 Q256 185 307 210 L307 235 L205 235 Z" fill="#88bbee"/>
+  
+  <!-- TCDD Text -->
+  <text x="256" y="150" font-family="Arial, sans-serif" font-weight="900" font-size="44" fill="#0f2b5c" text-anchor="middle" letter-spacing="4">TCDD</text>
+  <text x="256" y="420" font-family="Arial, sans-serif" font-weight="bold" font-size="24" fill="#ffffff" text-anchor="middle" letter-spacing="2">PERSONEL</text>
+</svg>

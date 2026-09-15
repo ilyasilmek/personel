@@ -38,6 +38,7 @@ import {
   getBolumListesi,
   getEgitimSeviyesi,
 } from '../data/educationData';
+import { PWAInstallButton } from './PWAInstallButton';
 import { exportSinglePersonnelPdf, exportPersonnelToExcel, exportPersonnelToPdf } from '../utils/exportUtils';
 import { searchMatches } from '../utils/textUtils';
 
@@ -421,6 +422,11 @@ export function TcddPersonelFormu({
             <span>Genel Liste</span>
           </button>
         )}
+
+        {/* PWA Masaüstüne Kur / Çevrimdışı Desteği */}
+        <div className="ml-1">
+          <PWAInstallButton />
+        </div>
 
         <div className="ml-auto flex items-center gap-2 text-[11px] text-gray-600 pr-2">
           <span>Veritabanı: <b className="text-blue-900">Merkezi Sunucu (Online)</b></span>

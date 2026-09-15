@@ -1,0 +1,44 @@
+name: Windows EXE Derleyici (Build & Package)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-windows-exe:
+    name: Windows 64-bit .EXE Olustur
+    runs-on: windows-latest
+
+    steps:
+      - name: Kodu Klonla
+        uses: actions/checkout@v4
+
+      - name: Node.js Ortamini Hazirla
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Bagimliliklari Yukle
+        run: npm ci || npm install
+
+      - name: Web Uygulamasini Derle (Vite Build)
+        run: npm run build
+
+      - name: Windows EXE Paketle
+        run: |
+          npx electron-packager . "TCDD_Personel_Yonetim" --platform=win32 --arch=x64 --out=dist_exe --overwrite --prune=true
+
+      - name: EXE Klasorunu ZIP Olarak Sikistir
+        run: |
+          Compress-Archive -Path dist_exe/TCDD_Personel_Yonetim-win32-x64/* -DestinationPath dist_exe/TCDD_Personel_Yonetim_Windows_x64.zip
+
+      - name: EXE Dosyasini GitHub Artifact Olarak Yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: TCDD_Personel_Yonetim_Windows_x64
+          path: dist_exe/TCDD_Personel_Yonetim_Windows_x64.zip
+          retention-days: 30
