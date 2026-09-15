@@ -1,0 +1,6 @@
+{
+  "name": "Personel Yönetim Sistemi (Windows C# & SQL)",
+  "description": "Windows ortamında çalışan, C# ve SQL mimarisine sahip CRUD işlemleri, raporlama, Excel ve PDF dışa aktarma, kullanıcı yetkilendirme ve veritabanı yedekleme özellikli kapsamlı personel programı.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
