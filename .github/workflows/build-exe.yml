@@ -19,18 +19,17 @@ jobs:
       - name: Node.js Ortamini Hazirla
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 22
 
       - name: Bagimliliklari Yukle
-        run: npm ci || npm install
+        run: npm install
 
       - name: Web Uygulamasini Derle (Vite Build)
         run: npm run build
 
       - name: Windows EXE Paketle
         run: |
-          npx electron-packager . "TCDD_Personel_Yonetim" --platform=win32 --arch=x64 --out=dist_exe --overwrite --prune=true
+          npx --yes electron-packager . "TCDD_Personel_Yonetim" --platform=win32 --arch=x64 --out=dist_exe --overwrite --prune=true
 
       - name: EXE Klasorunu ZIP Olarak Sikistir
         run: |
