@@ -22,7 +22,10 @@ jobs:
           node-version: 22
 
       - name: Bagimliliklari Yukle
-        run: npm install
+        shell: pwsh
+        run: |
+          if (Test-Path package-lock.json) { Remove-Item package-lock.json -Force }
+          npm install --no-package-lock
 
       - name: Web Uygulamasini Derle (Vite Build)
         run: npm run build
