@@ -44,7 +44,7 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
               <span>Yazdır / PDF Olarak Kaydet (Ctrl+P)</span>
             </button>
             <button
-              onClick={() => exportPersonnelToExcel(personeller, grupAdi.replace(/\s+/g, '_'))}
+              onClick={() => exportPersonnelToExcel(personeller, aktifGrup)}
               className="bg-emerald-800 hover:bg-emerald-900 text-white px-2.5 py-1 text-xs rounded-xs flex items-center gap-1 shadow-xs cursor-pointer"
               title="Excel İndir"
             >
@@ -52,7 +52,7 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
               <span>Excel</span>
             </button>
             <button
-              onClick={() => exportPersonnelToPdf(personeller)}
+              onClick={() => exportPersonnelToPdf(personeller, aktifGrup)}
               className="bg-blue-800 hover:bg-blue-900 text-white px-2.5 py-1 text-xs rounded-xs flex items-center gap-1 shadow-xs cursor-pointer"
               title="PDF İndir"
             >

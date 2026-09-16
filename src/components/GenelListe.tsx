@@ -174,11 +174,8 @@ export const GenelListe: React.FC<GenelListeProps> = ({
 
           <button
             onClick={() => {
-              exportPersonnelToExcel(
-                filtrelenmisPersoneller,
-                aktifGrup === 'MEMUR' ? 'MEMUR_PERSONEL_LISTESI' : 'ISCI_PERSONEL_LISTESI'
-              );
-              showToast('Personel listesi Excel olarak indirildi.');
+              exportPersonnelToExcel(filtrelenmisPersoneller, aktifGrup);
+              showToast(`${aktifGrup === 'ISCI' ? 'İŞÇİ LİSTE' : 'MEMUR LİSTE'} Excel olarak indirildi.`);
             }}
             className="px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-800 font-semibold rounded-xs border border-[#95a5a6] shadow-xs flex items-center space-x-1 cursor-pointer text-xs"
             title="Mevcut listeyi Excel formatında indir"

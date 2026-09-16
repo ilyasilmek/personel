@@ -1,6 +1,6 @@
 {
-  "name": "Personel Yönetim Sistemi (Windows C# & SQL)",
-  "description": "Windows ortamında çalışan, C# ve SQL mimarisine sahip CRUD işlemleri, raporlama, Excel ve PDF dışa aktarma, kullanıcı yetkilendirme ve veritabanı yedekleme özellikli kapsamlı personel programı.",
+  "name": "Gebze Vagon Bakım Atölye Müdürlüğü Personel Takip",
+  "description": "Gebze Vagon Bakım Atölye Müdürlüğü Personel Takip, Özlük ve Sicil Yönetim Sistemi.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

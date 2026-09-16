@@ -31,6 +31,9 @@ import {
   Info,
   Table,
   ArrowLeft,
+  X,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import {
   EGITIM_SEVIYELERI,
@@ -50,6 +53,7 @@ interface TcddPersonelFormuProps {
   onOpenYedekleme: () => void;
   onResmiYazdir?: (personel?: Personel) => void;
   seciliPersonelId?: string;
+  onSeciliPersonelChange?: (id: string) => void;
   isBosFormMode?: boolean;
   aktifGrup?: PersonelTuru;
   onAramaEkraninaDon?: () => void;
@@ -94,12 +98,13 @@ export function TcddPersonelFormu({
   onOpenYedekleme,
   onResmiYazdir,
   seciliPersonelId,
+  onSeciliPersonelChange,
   isBosFormMode = false,
   aktifGrup = 'ISCI',
   onAramaEkraninaDon,
   onGenelListeAc,
 }: TcddPersonelFormuProps) {
-  // Seçili personel
+  // Seçili personel ID
   const [seciliId, setSeciliId] = useState<string>(() => {
     if (isBosFormMode) return '';
     if (seciliPersonelId) return seciliPersonelId;
@@ -107,17 +112,19 @@ export function TcddPersonelFormu({
     return gruptakiler[0]?.id || personeller[0]?.id || '';
   });
 
-  // Düzenleme modu
+  // Düzenleme modu: Form açıldığında varsayılan olarak Pasiftir (salt okunur).
+  // Sadece "Düzenle" butonuna basılınca veya "Yeni Ekle" denince düzenlenebilir olur.
   const [duzenlemeModu, setDuzenlemeModu] = useState<boolean>(isBosFormMode);
   const [isNewRecord, setIsNewRecord] = useState<boolean>(isBosFormMode);
+  const oncekiPersonelRef = useRef<Personel | null>(null);
 
-  // Form State - Güvenli ilk değer ataması
+  // Form Verisi
   const [formData, setFormData] = useState<Personel>(() => {
     if (isBosFormMode) {
       return createEmptyPersonel(aktifGrup);
     }
     const targetId = seciliPersonelId || seciliId;
-    const p = personeller.find(x => x.id === targetId) || personeller[0] || createEmptyPersonel(aktifGrup);
+    const p = personeller.find(x => x.id === targetId) || personeller.find(x => (x.personelTuru || 'ISCI') === aktifGrup) || personeller[0] || createEmptyPersonel(aktifGrup);
     return {
       ...p,
       personelTuru: p.personelTuru || aktifGrup,
@@ -126,22 +133,41 @@ export function TcddPersonelFormu({
     };
   });
 
-  // isBosFormMode değiştiğinde formu boşalt ve yeni kayıt moduna al
+  // Dışarıdan veya listeden personel seçildiğinde doğrudan pasif modda form güncellemesi
+  const handlePersonelSecimi = (target: Personel) => {
+    setIsNewRecord(false);
+    setDuzenlemeModu(false); // Yeni kayıt seçildiğinde form daima pasif olarak açılır
+    setSeciliId(target.id);
+    setFormData({
+      ...target,
+      personelTuru: target.personelTuru || aktifGrup,
+      evraklar: target.evraklar || [],
+      egitimlerVeKurslar: target.egitimlerVeKurslar || [],
+    });
+    setManuelBolumGirisi(false);
+    if (onSeciliPersonelChange) {
+      onSeciliPersonelChange(target.id);
+    }
+  };
+
+  // Dışarıdan seciliPersonelId prop'u değiştiğinde (örneğin Arama sayfasından tıklandığında) senkronize et
+  const sonSenkronIdRef = useRef<string | undefined>(seciliPersonelId);
+
   useEffect(() => {
     if (isBosFormMode) {
       setFormData(createEmptyPersonel(aktifGrup));
       setIsNewRecord(true);
       setDuzenlemeModu(true);
       setSeciliId('');
+      sonSenkronIdRef.current = undefined;
+      return;
     }
-  }, [isBosFormMode, aktifGrup]);
 
-  // Dışarıdan seçili personel ID değiştiğinde senkronize et
-  useEffect(() => {
-    if (seciliPersonelId && !isBosFormMode && seciliPersonelId !== seciliId) {
-      setSeciliId(seciliPersonelId);
+    if (seciliPersonelId && seciliPersonelId !== sonSenkronIdRef.current) {
+      sonSenkronIdRef.current = seciliPersonelId;
       const target = personeller.find(p => p.id === seciliPersonelId);
       if (target) {
+        setSeciliId(target.id);
         setFormData({
           ...target,
           personelTuru: target.personelTuru || aktifGrup,
@@ -149,10 +175,11 @@ export function TcddPersonelFormu({
           egitimlerVeKurslar: target.egitimlerVeKurslar || [],
         });
         setIsNewRecord(false);
-        setDuzenlemeModu(false);
+        setDuzenlemeModu(false); // Arama veya listeden seçildiğinde form pasif başlar
+        setManuelBolumGirisi(false);
       }
     }
-  }, [seciliPersonelId, isBosFormMode, aktifGrup, personeller, seciliId]);
+  }, [seciliPersonelId, isBosFormMode, aktifGrup, personeller]);
 
   // Arama ve filtre
   const [aramaMetni, setAramaMetni] = useState('');
@@ -165,45 +192,44 @@ export function TcddPersonelFormu({
   const [yeniEvrakAdi, setYeniEvrakAdi] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docFileInputRef = useRef<HTMLInputElement>(null);
-  const prevSeciliIdRef = useRef<string | null>(seciliId);
 
-  // Seçili personel ID'si değiştiğinde form verisini güncelle.
-  useEffect(() => {
-    const idDegisti = prevSeciliIdRef.current !== seciliId;
-    prevSeciliIdRef.current = seciliId;
+  // Aktif gruptaki personeller ve filtrelenmiş liste
+  const gruptakiPersoneller = personeller.filter(p => (p.personelTuru || 'ISCI') === aktifGrup);
 
-    if (isNewRecord) {
-      return;
-    }
-
-    // Kullanıcı mevcut kaydı düzenliyorsa ve başka bir personele tıklamadıysa formu ezme!
-    if (duzenlemeModu && !idDegisti) {
-      return;
-    }
-
-    const aktif = personeller.find(p => p.id === seciliId);
-    if (aktif) {
-      setFormData({
-        ...aktif,
-        personelTuru: aktif.personelTuru || aktifGrup,
-        evraklar: aktif.evraklar || [],
-        egitimlerVeKurslar: aktif.egitimlerVeKurslar || [],
-      });
-      setManuelBolumGirisi(false);
-      if (idDegisti) {
-        setDuzenlemeModu(false);
-      }
-    }
-  }, [seciliId, personeller, isNewRecord, duzenlemeModu, aktifGrup]);
-
-  // Filtrelenmiş liste (Türkçe büyük/küçük harf duyarsız arama)
-  const filtrelenmisPersoneller = personeller.filter(p => {
+  const filtrelenmisPersoneller = gruptakiPersoneller.filter(p => {
     if (!aramaMetni.trim()) return true;
-    if (aramaTuru === 'tcKimlik') return searchMatches(p.tcKimlik, aramaMetni);
+    if (aramaTuru === 'tcKimlik') return searchMatches(p.tcKimlik, aramaMetni) || searchMatches(p.sicilNo, aramaMetni);
     if (aramaTuru === 'ad') return searchMatches(p.ad, aramaMetni);
     if (aramaTuru === 'soyad') return searchMatches(p.soyad, aramaMetni);
-    return true;
+    return searchMatches(`${p.ad} ${p.soyad}`, aramaMetni) || searchMatches(p.sicilNo, aramaMetni);
   });
+
+  // Kayıt Gezintisi (Navigation)
+  const currentIdx = filtrelenmisPersoneller.findIndex(p => p.id === seciliId);
+  const totalCount = filtrelenmisPersoneller.length;
+
+  const handleIlk = () => {
+    if (filtrelenmisPersoneller.length > 0) {
+      handlePersonelSecimi(filtrelenmisPersoneller[0]);
+    }
+  };
+  const handleOnceki = () => {
+    if (filtrelenmisPersoneller.length > 0) {
+      const idx = currentIdx > 0 ? currentIdx - 1 : 0;
+      handlePersonelSecimi(filtrelenmisPersoneller[idx]);
+    }
+  };
+  const handleSonraki = () => {
+    if (filtrelenmisPersoneller.length > 0) {
+      const idx = currentIdx < filtrelenmisPersoneller.length - 1 ? currentIdx + 1 : filtrelenmisPersoneller.length - 1;
+      handlePersonelSecimi(filtrelenmisPersoneller[idx]);
+    }
+  };
+  const handleSon = () => {
+    if (filtrelenmisPersoneller.length > 0) {
+      handlePersonelSecimi(filtrelenmisPersoneller[filtrelenmisPersoneller.length - 1]);
+    }
+  };
 
   // Form Alanı Değişikliği
   const handleInputChange = (field: keyof Personel, value: any) => {
@@ -248,20 +274,50 @@ export function TcddPersonelFormu({
     setManuelBolumGirisi(false);
   };
 
+  // Düzenleme Modunu Aç
+  const handleDuzenle = () => {
+    setDuzenlemeModu(true);
+    showToast(`${formData.ad} ${formData.soyad} personeli için form düzenlemeye açıldı.`);
+  };
+
+  // Düzenlemeden Vazgeç (Orijinal Veriye Dön ve Pasif Yap)
+  const handleDuzenleIptal = () => {
+    const original = personeller.find(p => p.id === formData.id);
+    if (original) {
+      setFormData({
+        ...original,
+        personelTuru: original.personelTuru || aktifGrup,
+        evraklar: original.evraklar || [],
+        egitimlerVeKurslar: original.egitimlerVeKurslar || [],
+      });
+    }
+    setDuzenlemeModu(false);
+    showToast('Düzenleme iptal edildi, form korumalı (pasif) moda alındı.');
+  };
+
   // Yeni Ekle
   const handleYeniEkle = () => {
+    oncekiPersonelRef.current = { ...formData };
     const yeni = createEmptyPersonel(formData?.personelTuru || aktifGrup);
     setFormData(yeni);
     setIsNewRecord(true);
     setDuzenlemeModu(true);
     setSeciliId('');
-    showToast(`Yeni ${yeni.personelTuru === 'MEMUR' ? 'Memur' : 'İşçi'} personel formu açıldı. Bilgileri girip [Kaydet] butonuna basınız.`);
+    showToast(`Yeni ${yeni.personelTuru === 'MEMUR' ? 'Memur' : 'İşçi'} personel formu açıldı. Bilgileri girip [Kaydet] butonuna basınız veya vazgeçmek için [İptal Et] butonunu kullanınız.`);
   };
 
-  // Düzenle
-  const handleDuzenle = () => {
-    setDuzenlemeModu(true);
-    showToast('Düzenleme modu aktif. Alanları güncelleyip [Güncelle] butonuna basınız.');
+  // İptal Et (Yeni personel eklemeden vazgeçme)
+  const handleIptalEt = () => {
+    setIsNewRecord(false);
+    setDuzenlemeModu(false);
+    if (oncekiPersonelRef.current && oncekiPersonelRef.current.id) {
+      setFormData({ ...oncekiPersonelRef.current });
+      setSeciliId(oncekiPersonelRef.current.id);
+    } else if (gruptakiPersoneller.length > 0) {
+      setFormData({ ...gruptakiPersoneller[0] });
+      setSeciliId(gruptakiPersoneller[0].id);
+    }
+    showToast('Yeni personel ekleme işlemi iptal edildi.');
   };
 
   // Kaydet / Güncelle
@@ -273,7 +329,7 @@ export function TcddPersonelFormu({
 
     onPersonelKaydet(formData, isNewRecord);
     setIsNewRecord(false);
-    setDuzenlemeModu(false);
+    setDuzenlemeModu(false); // Kayıttan sonra form otomatik olarak pasif moda döner
     setSeciliId(formData.id);
     showToast(`${formData.ad} ${formData.soyad} (${formData.sicilNo}) başarıyla kaydedildi.`);
   };
@@ -286,6 +342,7 @@ export function TcddPersonelFormu({
       const kalanlar = personeller.filter(p => p.id !== formData.id);
       if (kalanlar.length > 0) {
         setSeciliId(kalanlar[0].id);
+        setDuzenlemeModu(false);
       }
     }
   };
@@ -296,7 +353,6 @@ export function TcddPersonelFormu({
       const ilk = filtrelenmisPersoneller[0];
       setSeciliId(ilk.id);
       setFormData({ ...ilk });
-      setDuzenlemeModu(false);
       setIsNewRecord(false);
       showToast(`Sicil No: ${ilk.sicilNo} (${ilk.ad} ${ilk.soyad}) bilgileri ekrana getirildi.`);
     } else {
@@ -381,12 +437,19 @@ export function TcddPersonelFormu({
           <button className="px-2 py-0.5 hover:bg-[#316ac5] hover:text-white rounded-none cursor-pointer">
             Düzen
           </button>
-          <div className="hidden group-hover:flex flex-col absolute top-full left-0 bg-white border border-gray-400 shadow-lg z-50 min-w-[180px] py-1 text-black">
-            <button onClick={handleDuzenle} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white">
-              Seçili Kaydı Düzenle
-            </button>
-            <button onClick={handleSil} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white text-red-700">
-              Personel Kaydını Sil
+          <div className="hidden group-hover:flex flex-col absolute top-full left-0 bg-white border border-gray-400 shadow-lg z-50 min-w-[190px] py-1 text-black">
+            {!duzenlemeModu ? (
+              <button onClick={handleDuzenle} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center justify-between">
+                <span>Kaydı Düzenle</span> <span className="text-[10px] text-gray-400">Ctrl+E</span>
+              </button>
+            ) : (
+              <button onClick={handleDuzenleIptal} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center justify-between">
+                <span>Düzenlemeden Vazgeç</span> <span className="text-[10px] text-gray-400">Esc</span>
+              </button>
+            )}
+            <hr className="my-1 border-gray-200" />
+            <button onClick={handleSil} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white text-red-700 flex items-center justify-between">
+              <span>Personel Kaydını Sil</span> <span className="text-[10px] text-gray-400">Del</span>
             </button>
           </div>
         </div>
@@ -410,7 +473,7 @@ export function TcddPersonelFormu({
         </div>
 
         <div className="relative group">
-          <button onClick={() => alert('TCDD VAGON BAKIM ONARIM ATELYE MÜDÜRLÜĞÜ\nPersonel Takip Programı\nMerkezi Online Veritabanı ve Senkronizasyon')} className="px-2 py-0.5 hover:bg-[#316ac5] hover:text-white rounded-none cursor-pointer">
+          <button onClick={() => alert('GEBZE VAGON BAKIM ATÖLYE MÜDÜRLÜĞÜ\nPersonel Takip Programı\nMerkezi Online Veritabanı ve Senkronizasyon')} className="px-2 py-0.5 hover:bg-[#316ac5] hover:text-white rounded-none cursor-pointer">
             Yardım
           </button>
         </div>
@@ -450,131 +513,217 @@ export function TcddPersonelFormu({
         </div>
       </div>
 
-      {/* 2. FORM HEADER WITH TCDD TITLE, PERSONEL NO & SICIL NO */}
-      <div className="px-4 pt-2.5 pb-2 flex flex-wrap items-center justify-between gap-3 border-b border-[#d8d4c8] bg-[#ebe7d7]">
-        <div className="flex-1 min-w-[280px]">
-          <h1 className="text-[17px] font-black tracking-wide text-gray-900 uppercase font-sans">
-            TCDD VAGON BAKIM ONARIM ATELYE MÜDÜRLÜĞÜ
-          </h1>
-          <div className="text-[11px] text-gray-600 font-medium">
-            Personel Sicil ve Özlük Bilgileri Takip Ekranı
+      {/* 2. MODERN PERSONEL BİLGİ & GEZİNTİ BARI (TEKRARLANAN BAŞLIK KALDIRILDI) */}
+      <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white shadow-2xs">
+        {/* Seçili Personel Özeti & Kadro Rozeti */}
+        <div className="flex items-center gap-3 min-w-[260px]">
+          <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+            {formData.fotografUrl ? (
+              <img src={formData.fotografUrl} alt={formData.ad} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-sm font-bold text-slate-600 font-mono">
+                {(formData.ad?.[0] || 'P') + (formData.soyad?.[0] || '')}
+              </span>
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-bold text-slate-900 tracking-tight">
+                {formData.ad || formData.soyad ? `${formData.ad} ${formData.soyad}` : 'Yeni Personel Kaydı'}
+              </span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                  aktifGrup === 'MEMUR'
+                    ? 'bg-amber-50 text-amber-800 border-amber-300'
+                    : 'bg-blue-50 text-blue-800 border-blue-300'
+                }`}
+              >
+                {aktifGrup === 'MEMUR' ? 'Memur Kadrosu' : 'İşçi Kadrosu'}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300">
+                {formData.durum || 'Aktif'}
+              </span>
+
+              {/* FORM KORUMA (PASİF / AKTİF) DURUM ROZETİ */}
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
+                  duzenlemeModu
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    : 'bg-amber-50 text-amber-800 border-amber-300'
+                }`}
+                title={duzenlemeModu ? 'Form şu an düzenlenebilir durumdadır.' : 'Form korumalı (salt okunur) durumdadır. Değiştirmek için Düzenle butonuna basınız.'}
+              >
+                {duzenlemeModu ? (
+                  <>
+                    <Unlock className="w-3 h-3 text-emerald-600" />
+                    <span>Düzenleme Açık</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3 h-3 text-amber-600" />
+                    <span>Form Pasif</span>
+                  </>
+                )}
+              </span>
+            </div>
+            <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+              <span>Sicil: <b className="text-slate-800 font-mono">{formData.sicilNo || '-'}</b></span>
+              <span>•</span>
+              <span>Ünvan: <span className="text-slate-700 font-medium">{formData.unvan || formData.sanatKodu || '-'}</span></span>
+            </div>
           </div>
         </div>
 
-        {/* BÜYÜK PERSONEL NO, SICIL NO VE KADRO TÜRÜ KUTULARI */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        {/* Kayıt Gezinti Butonları (İlk, Önceki, [Kayıt 1 / 106], Sonraki, Son) */}
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded border border-slate-300 shadow-2xs">
+          <button
+            onClick={handleIlk}
+            disabled={currentIdx <= 0 || totalCount === 0}
+            className="px-2 py-1 text-xs font-semibold rounded bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 border border-slate-300 cursor-pointer shadow-2xs"
+            title="İlk Kayıt"
+          >
+            ⏮ İlk
+          </button>
+          <button
+            onClick={handleOnceki}
+            disabled={currentIdx <= 0 || totalCount === 0}
+            className="px-2.5 py-1 text-xs font-semibold rounded bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 border border-slate-300 cursor-pointer shadow-2xs"
+            title="Önceki Kayıt"
+          >
+            ◀ Önceki
+          </button>
+          <div className="px-3 py-1 text-xs font-bold text-slate-800 bg-white rounded border border-slate-300 min-w-[90px] text-center font-mono">
+            {totalCount > 0 && currentIdx >= 0 ? `${currentIdx + 1} / ${totalCount}` : totalCount > 0 ? `1 / ${totalCount}` : '0 / 0'}
+          </div>
+          <button
+            onClick={handleSonraki}
+            disabled={currentIdx >= totalCount - 1 || totalCount === 0}
+            className="px-2.5 py-1 text-xs font-semibold rounded bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 border border-slate-300 cursor-pointer shadow-2xs"
+            title="Sonraki Kayıt"
+          >
+            Sonraki ▶
+          </button>
+          <button
+            onClick={handleSon}
+            disabled={currentIdx >= totalCount - 1 || totalCount === 0}
+            className="px-2 py-1 text-xs font-semibold rounded bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 border border-slate-300 cursor-pointer shadow-2xs"
+            title="Son Kayıt"
+          >
+            Son ⏭
+          </button>
+        </div>
+
+        {/* BÜYÜK PERSONEL NO VE SICIL NO KARTLARI */}
+        <div className="flex items-center gap-2.5">
           {/* Personel No */}
-          <div className="flex items-center gap-1.5 bg-[#f0ede1] p-1 border border-[#c0bdb2] shadow-2xs">
-            <span className="text-xs font-bold text-gray-800 whitespace-nowrap px-1">Personel No</span>
-            {duzenlemeModu || isNewRecord ? (
-              <input
-                id="input-personel-no"
-                type="text"
-                value={formData.personelNo || ''}
-                onChange={(e) => handleInputChange('personelNo', e.target.value)}
-                placeholder="P-1001"
-                className="bg-white border-2 border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner px-3 py-0.5 text-lg font-black tracking-wider text-purple-950 w-[125px] text-center"
-              />
-            ) : (
-              <div
-                onClick={() => {
-                  setDuzenlemeModu(true);
-                  showToast('Düzenleme modu aktif. Personel No ve Sicil No alanlarını düzenleyebilirsiniz.');
-                }}
-                title="Düzenlemek için tıklayın veya [Düzenle] butonuna basınız"
-                className="bg-white border-2 border-[#7f9db9] hover:border-blue-500 shadow-inner px-3 py-0.5 text-lg font-black tracking-wider text-purple-950 min-w-[115px] text-center cursor-pointer"
-              >
-                {formData.personelNo || '-------'}
-              </div>
-            )}
+          <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded border border-slate-300 shadow-2xs">
+            <span className="text-xs font-bold text-slate-600 whitespace-nowrap">Personel No</span>
+            <input
+              id="input-personel-no"
+              type="text"
+              disabled={!duzenlemeModu}
+              value={formData.personelNo || ''}
+              onChange={(e) => handleInputChange('personelNo', e.target.value)}
+              placeholder="P-1001"
+              className={`border rounded px-2 py-0.5 text-base font-black tracking-wider w-[110px] text-center font-mono ${
+                duzenlemeModu
+                  ? 'bg-white border-slate-300 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500/20 text-purple-900'
+                  : 'bg-[#f0ede1] border-[#c0bdb2] text-purple-950 cursor-not-allowed'
+              }`}
+            />
           </div>
 
           {/* Sicil No */}
-          <div className="flex items-center gap-1.5 bg-[#f0ede1] p-1 border border-[#c0bdb2] shadow-2xs">
-            <span className="text-xs font-bold text-gray-800 whitespace-nowrap px-1">Sicil No</span>
-            {duzenlemeModu || isNewRecord ? (
-              <input
-                id="input-sicil-no"
-                type="text"
-                value={formData.sicilNo || ''}
-                onChange={(e) => handleInputChange('sicilNo', e.target.value)}
-                placeholder="4315073"
-                className="bg-white border-2 border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner px-3 py-0.5 text-lg font-black tracking-wider text-blue-900 w-[140px] text-center"
-              />
-            ) : (
-              <div
-                onClick={() => {
-                  setDuzenlemeModu(true);
-                  showToast('Düzenleme modu aktif. Sicil No alanını düzenleyebilirsiniz.');
-                }}
-                title="Düzenlemek için tıklayın veya [Düzenle] butonuna basınız"
-                className="bg-white border-2 border-[#7f9db9] hover:border-blue-500 shadow-inner px-4 py-0.5 text-lg font-black tracking-wider text-black min-w-[130px] text-center cursor-pointer"
-              >
-                {formData.sicilNo || '-------'}
-              </div>
-            )}
+          <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded border border-slate-300 shadow-2xs">
+            <span className="text-xs font-bold text-slate-600 whitespace-nowrap">Sicil No</span>
+            <input
+              id="input-sicil-no"
+              type="text"
+              disabled={!duzenlemeModu}
+              value={formData.sicilNo || ''}
+              onChange={(e) => handleInputChange('sicilNo', e.target.value)}
+              placeholder="4315073"
+              className={`border rounded px-2 py-0.5 text-base font-black tracking-wider w-[115px] text-center font-mono ${
+                duzenlemeModu
+                  ? 'bg-white border-slate-300 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500/20 text-blue-900'
+                  : 'bg-[#f0ede1] border-[#c0bdb2] text-blue-950 cursor-not-allowed'
+              }`}
+            />
           </div>
         </div>
       </div>
 
       {/* 3. MAIN BODY CONTAINER */}
-      <div className="flex-1 overflow-auto p-3 flex gap-3 min-h-0">
+      <div className="flex-1 overflow-auto p-3 flex gap-3 min-h-0 bg-slate-100">
         {/* LEFT COLUMN: KAYITLI PERSONEL LISTESİ */}
-        <div className="w-[310px] shrink-0 flex flex-col bg-[#f5f4ef] border border-[#7f9db9] p-2 shadow-xs">
-          <div className="font-semibold text-gray-800 text-[11px] mb-1.5 flex items-center justify-between">
-            <span>Kayıtlı Personel Listesi</span>
-            <span className="text-[10px] text-gray-500 font-normal">Toplam {personeller.length} personel</span>
+        <div className="w-[320px] shrink-0 flex flex-col bg-white border border-slate-300 rounded shadow-xs overflow-hidden">
+          <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex items-center justify-between">
+            <span className="font-bold text-slate-800 text-xs">
+              {aktifGrup === 'MEMUR' ? 'Memur Personel Listesi' : 'İşçi Personel Listesi'}
+            </span>
+            <span className="text-[11px] text-slate-500 font-semibold bg-white px-2 py-0.5 rounded border border-slate-200">
+              {gruptakiPersoneller.length} Kişi
+            </span>
+          </div>
+
+          {/* HIZLI ARAMA */}
+          <div className="p-2 border-b border-slate-200 bg-white flex items-center gap-1.5">
+            <input
+              type="text"
+              placeholder="İsim veya Sicil No ile filtrele..."
+              value={aramaMetni}
+              onChange={(e) => setAramaMetni(e.target.value)}
+              className="flex-1 bg-slate-50 border border-slate-300 focus:bg-white focus:outline-none focus:border-blue-600 rounded px-2 py-1 text-xs"
+            />
+            {aramaMetni && (
+              <button
+                onClick={() => setAramaMetni('')}
+                className="text-xs text-slate-400 hover:text-slate-700 px-1"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* DATAGRID TABLE */}
-          <div className="flex-1 overflow-auto bg-white border border-[#7f9db9] min-h-[220px]">
+          <div className="flex-1 overflow-auto bg-white min-h-[220px]">
             <table className="w-full text-left border-collapse text-[11px]">
-              <thead className="bg-[#ece9d8] sticky top-0 border-b border-[#7f9db9] shadow-xs">
+              <thead className="bg-slate-100 sticky top-0 border-b border-slate-200 shadow-2xs">
                 <tr>
-                  <th className="w-4 p-0.5 border-r border-[#d4d0c8] bg-[#ece9d8]"></th>
-                  <th className="p-1 font-semibold border-r border-[#d4d0c8] text-gray-800">TC</th>
-                  <th className="p-1 font-semibold text-gray-800">
-                    <div className="flex items-center justify-between">
-                      <span>Ad Soyad</span>
-                      <span className="text-[8px] text-gray-600">▲</span>
-                    </div>
-                  </th>
+                  <th className="w-6 p-1 text-center font-bold text-slate-600 border-r border-slate-200">#</th>
+                  <th className="p-1.5 font-bold border-r border-slate-200 text-slate-700">Sicil</th>
+                  <th className="p-1.5 font-bold text-slate-700">Adı Soyadı</th>
                 </tr>
               </thead>
               <tbody>
-                {filtrelenmisPersoneller.map((p) => {
+                {filtrelenmisPersoneller.map((p, idx) => {
                   const isSelected = p.id === seciliId;
                   return (
                     <tr
                       key={p.id}
-                      onClick={() => {
-                        setIsNewRecord(false);
-                        setSeciliId(p.id);
-                        setFormData({ ...p });
-                        setDuzenlemeModu(false);
-                      }}
-                      className={`cursor-pointer border-b border-gray-100 ${
+                      onClick={() => handlePersonelSecimi(p)}
+                      className={`cursor-pointer border-b border-slate-100 transition-colors ${
                         isSelected
-                          ? 'bg-[#316ac5] text-white font-medium'
-                          : 'hover:bg-blue-50 text-gray-900 even:bg-[#fafaf8]'
+                          ? 'bg-blue-600 text-white font-medium shadow-inner'
+                          : 'hover:bg-blue-50 text-slate-900 even:bg-slate-50/60'
                       }`}
                     >
-                      <td className="w-4 text-center p-0.5 bg-[#ece9d8] border-r border-[#d4d0c8] text-[9px] text-black">
-                        {isSelected ? '▶' : ''}
+                      <td className={`w-6 text-center p-1 border-r text-[10px] font-mono ${isSelected ? 'border-blue-500 text-blue-100' : 'border-slate-200 text-slate-500'}`}>
+                        {idx + 1}
                       </td>
-                      <td className="p-1 border-r border-[#e0ded6] whitespace-nowrap font-mono text-[10.5px]">
-                        {p.tcKimlik}
+                      <td className={`p-1.5 border-r whitespace-nowrap font-mono text-xs font-semibold ${isSelected ? 'border-blue-500 text-white' : 'border-slate-200 text-slate-800'}`}>
+                        {p.sicilNo || '-'}
                       </td>
-                      <td className="p-1 whitespace-nowrap">
-                        <span className="font-semibold">{p.ad}</span>{' '}
-                        <span className="uppercase font-bold">{p.soyad}</span>
+                      <td className="p-1.5 whitespace-nowrap">
+                        <span className={isSelected ? 'text-white font-medium' : 'text-slate-900 font-medium'}>{p.ad}</span>{' '}
+                        <span className={`font-bold ${isSelected ? 'text-white' : 'text-slate-900'}`}>{p.soyad}</span>
                       </td>
                     </tr>
                   );
                 })}
                 {filtrelenmisPersoneller.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="text-center py-6 text-gray-400 italic">
+                    <td colSpan={3} className="text-center py-8 text-slate-400 italic">
                       Kayıt bulunamadı.
                     </td>
                   </tr>
@@ -1010,10 +1159,16 @@ export function TcddPersonelFormu({
               </button>
 
               <button
+                disabled={!duzenlemeModu}
                 onClick={() => fileInputRef.current?.click()}
-                className="bg-[#ece9d8] hover:bg-[#dfdbcb] active:bg-[#cfcbba] border border-[#7f9db9] px-2 py-1.5 text-[11px] font-semibold text-gray-900 shadow-xs flex items-center gap-1.5 cursor-pointer text-left"
+                className={`border px-2 py-1.5 text-[11px] font-semibold shadow-xs flex items-center gap-1.5 text-left ${
+                  duzenlemeModu
+                    ? 'bg-[#ece9d8] hover:bg-[#dfdbcb] active:bg-[#cfcbba] border-[#7f9db9] text-gray-900 cursor-pointer'
+                    : 'bg-[#f0ede1] border-[#c0bdb2] text-gray-400 cursor-not-allowed opacity-60'
+                }`}
+                title={duzenlemeModu ? 'Fotoğraf yükle' : 'Fotoğraf eklemek için önce Düzenle butonuna basınız'}
               >
-                <Camera className="w-4 h-4 text-blue-600 shrink-0" />
+                <Camera className={`w-4 h-4 shrink-0 ${duzenlemeModu ? 'text-blue-600' : 'text-gray-400'}`} />
                 <span className="leading-tight">Fotoğraf Ekle</span>
               </button>
               <input
@@ -1025,10 +1180,16 @@ export function TcddPersonelFormu({
               />
 
               <button
+                disabled={!duzenlemeModu || !formData.fotografUrl}
                 onClick={handleFotoSil}
-                className="bg-[#ece9d8] hover:bg-[#dfdbcb] active:bg-[#cfcbba] border border-[#7f9db9] px-2 py-1.5 text-[11px] font-semibold text-gray-900 shadow-xs flex items-center gap-1.5 cursor-pointer text-left"
+                className={`border px-2 py-1.5 text-[11px] font-semibold shadow-xs flex items-center gap-1.5 text-left ${
+                  duzenlemeModu && formData.fotografUrl
+                    ? 'bg-[#ece9d8] hover:bg-[#dfdbcb] active:bg-[#cfcbba] border-[#7f9db9] text-gray-900 cursor-pointer'
+                    : 'bg-[#f0ede1] border-[#c0bdb2] text-gray-400 cursor-not-allowed opacity-60'
+                }`}
+                title={duzenlemeModu ? 'Fotoğrafı sil' : 'Fotoğraf silmek için önce Düzenle butonuna basınız'}
               >
-                <XCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <XCircle className={`w-4 h-4 shrink-0 ${duzenlemeModu && formData.fotografUrl ? 'text-red-600' : 'text-gray-400'}`} />
                 <span className="leading-tight">Fotoğrafı Sil</span>
               </button>
             </div>
@@ -1122,68 +1283,128 @@ export function TcddPersonelFormu({
         </div>
       </div>
 
-      {/* 4. BOTTOM ACTION TOOLBAR (KAYDET, GÜNCELLE, SİL, DÜZENLE, YENİ EKLE) */}
-      <div className="bg-[#ebe7d7] border-t-2 border-[#d4d0c8] px-4 py-2 flex items-center justify-end gap-2.5 shadow-xs">
-        {/* KAYDET */}
-        <button
-          onClick={handleKaydetVeGuncelle}
-          disabled={!duzenlemeModu && !isNewRecord}
-          className={`flex items-center gap-1.5 px-4 py-1.5 border border-[#7f9db9] text-xs font-bold shadow-xs cursor-pointer ${
-            duzenlemeModu || isNewRecord
-              ? 'bg-[#316ac5] hover:bg-[#2857a4] active:bg-[#1f4585] text-white border-blue-900'
-              : 'bg-[#e1dfd6] text-gray-500 border-gray-300 cursor-not-allowed opacity-70'
-          }`}
-        >
-          <Save className="w-4 h-4 text-blue-200" />
-          <span>Kaydet</span>
-        </button>
+      {/* 4. BOTTOM ACTION TOOLBAR (RESMİ YAZDIR, DÜZENLE, GÜNCELLE, VAZGEÇ, YENİ EKLE, SİL) */}
+      <div className="bg-white border-t border-slate-300 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+        {/* SOL: RESMİ RAPOR & FORM KİLİT BİLGİSİ */}
+        <div className="flex items-center gap-3">
+          {onResmiYazdir && (
+            <button
+              onClick={() => onResmiYazdir(formData)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-semibold shadow-xs cursor-pointer transition-colors"
+            >
+              <Printer className="w-4 h-4 text-slate-300" />
+              <span>Resmi Rapor Yazdır / PDF</span>
+            </button>
+          )}
 
-        {/* GÜNCELLE */}
-        <button
-          onClick={handleKaydetVeGuncelle}
-          disabled={!duzenlemeModu || isNewRecord}
-          className={`flex items-center gap-1.5 px-4 py-1.5 border border-[#7f9db9] text-xs font-bold shadow-xs cursor-pointer ${
-            duzenlemeModu && !isNewRecord
-              ? 'bg-[#16a34a] hover:bg-[#15803d] active:bg-[#166534] text-white border-green-900'
-              : 'bg-[#e1dfd6] text-gray-500 border-gray-300 cursor-not-allowed opacity-70'
-          }`}
-        >
-          <Check className="w-4 h-4 text-green-200" />
-          <span>Güncelle</span>
-        </button>
+          {/* Form Kilit / Düzenleme Bilgi İpucu */}
+          {!isNewRecord && (
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded">
+              {duzenlemeModu ? (
+                <>
+                  <Unlock className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-800 font-semibold">Düzenleme Modu Açık</span>
+                  <span className="text-slate-400">• Değişiklikleri [Güncelle] ile kaydedin</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="text-slate-700 font-medium">Form Korumalı (Pasif)</span>
+                  <span className="text-slate-400">• Değiştirmek için <b>[Düzenle]</b> butonuna basınız</span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
-        {/* SİL */}
-        <button
-          onClick={handleSil}
-          disabled={isNewRecord}
-          className="flex items-center gap-1.5 px-4 py-1.5 bg-[#dc2626] hover:bg-[#b91c1c] active:bg-[#991b1b] border border-red-900 text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <Trash2 className="w-4 h-4 text-red-200" />
-          <span>Sil</span>
-        </button>
+        {/* SAĞ: İŞLEM BUTONLARI */}
+        <div className="flex items-center gap-2">
+          {isNewRecord ? (
+            <>
+              {/* KAYDET (Yeni Kayıt) */}
+              <button
+                id="btn-yeni-kaydet"
+                onClick={handleKaydetVeGuncelle}
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                title="Yeni personeli kaydet"
+              >
+                <Save className="w-4 h-4" />
+                <span>Kaydet</span>
+              </button>
 
-        {/* DÜZENLE */}
-        <button
-          onClick={handleDuzenle}
-          disabled={duzenlemeModu}
-          className={`flex items-center gap-1.5 px-4 py-1.5 border border-[#7f9db9] text-xs font-bold shadow-xs cursor-pointer ${
-            !duzenlemeModu
-              ? 'bg-[#e6a817] hover:bg-[#d4960e] active:bg-[#be8207] text-white border-amber-800'
-              : 'bg-[#e1dfd6] text-gray-500 border-gray-300 cursor-not-allowed opacity-70'
-          }`}
-        >
-          <Edit3 className="w-4 h-4 text-amber-200" />
-          <span>Düzenle</span>
-        </button>
+              {/* İPTAL ET (Yeni Eklemeden Vazgeçme) */}
+              <button
+                id="btn-iptal-et"
+                onClick={handleIptalEt}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-600 hover:bg-slate-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                title="Yeni personel ekleme işlemini iptal et ve önceki kayda dön"
+              >
+                <X className="w-4 h-4" />
+                <span>İptal Et</span>
+              </button>
+            </>
+          ) : (
+            <>
+              {/* PASİF MODDAYKEN: DÜZENLE BUTONU GÖRÜNÜR */}
+              {!duzenlemeModu ? (
+                <button
+                  id="btn-duzenle"
+                  onClick={handleDuzenle}
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                  title="Form alanlarını düzenlemeye aç"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  <span>Düzenle</span>
+                </button>
+              ) : (
+                /* AKTİF MODDAYKEN: GÜNCELLE VE VAZGEÇ BUTONLARI GÖRÜNÜR */
+                <>
+                  <button
+                    id="btn-guncelle"
+                    onClick={handleKaydetVeGuncelle}
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                    title="Değişiklikleri kaydet / güncelle"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Güncelle</span>
+                  </button>
 
-        {/* YENİ EKLE */}
-        <button
-          onClick={handleYeniEkle}
-          className="flex items-center gap-1.5 px-4 py-1.5 bg-[#0284c7] hover:bg-[#0369a1] active:bg-[#075985] border border-sky-900 text-white text-xs font-bold shadow-xs cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4 text-sky-200" />
-          <span>Yeni Ekle</span>
-        </button>
+                  <button
+                    id="btn-vazgec"
+                    onClick={handleDuzenleIptal}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-600 hover:bg-slate-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                    title="Değişikliklerden vazgeç ve formu tekrar pasif (korumalı) yap"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Vazgeç</span>
+                  </button>
+                </>
+              )}
+
+              {/* YENİ PERSONEL EKLE */}
+              <button
+                id="btn-yeni-ekle"
+                onClick={handleYeniEkle}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                title="Yeni personel ekleme formu aç"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Yeni Ekle</span>
+              </button>
+
+              {/* SİL */}
+              <button
+                id="btn-sil"
+                onClick={handleSil}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                title="Seçili personeli sil"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Sil</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* EVRAK VE BELGELER MODAL */}

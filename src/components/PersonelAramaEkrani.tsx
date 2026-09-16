@@ -139,63 +139,22 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#e8ecf1] font-sans text-xs overflow-hidden select-none">
-      {/* KULLANICI TALEBİ: İki adet tab'a gerek yok, bir tane yeter */}
-      {/* 1. ÜST BİLGİ VE KADRO GÖSTERGESİ */}
-      <div className="bg-[#1f3a60] border-b border-[#162c4a] px-4 py-2 flex items-center justify-between text-white shadow-sm">
-        <div className="flex items-center space-x-3">
-          <span className="text-xs font-semibold text-blue-200 hidden sm:inline">Aktif Kadro:</span>
-          <button
-            id="tab-kategori-toggle"
-            onClick={() => {
-              onGrupDegistir(aktifGrup === 'ISCI' ? 'MEMUR' : 'ISCI');
-              setSeciliPersonelId(null);
-            }}
-            className="px-3.5 py-1.5 bg-[#2a4d7d] hover:bg-[#38629b] text-white font-bold rounded-md flex items-center space-x-2 border border-blue-400/40 shadow-xs cursor-pointer transition-all text-xs"
-            title="Tıklayarak kadroyu değiştir"
-          >
-            {aktifGrup === 'ISCI' ? (
-              <Users className="w-4 h-4 text-amber-400" />
-            ) : (
-              <Briefcase className="w-4 h-4 text-cyan-300" />
-            )}
-            <span className="font-extrabold tracking-wide">
-              {aktifGrup === 'ISCI' ? 'İŞÇİ PERSONEL' : 'MEMUR PERSONEL'}
-            </span>
-            <span className="bg-blue-950 px-2 py-0.5 rounded-full text-[11px] text-amber-300 font-mono font-bold">
-              {aktifGrup === 'ISCI' ? `${isciSayisi} Kayıt` : `${memurSayisi} Kayıt`}
-            </span>
-            <span className="text-[11px] text-blue-200 underline font-normal ml-1">
-              ({aktifGrup === 'ISCI' ? "Memur'a Geç" : "İşçi'ye Geç"})
-            </span>
-          </button>
-        </div>
-
-        {/* Kurumsal Bilgi Rozeti */}
-        <div className="flex items-center space-x-2 text-white/80 text-xs font-semibold">
-          <span className="hidden md:inline">TCDD Personel Takip Sistemi</span>
-          <span className="hidden md:inline">•</span>
-          <span className="text-amber-300 font-bold">
-            Toplam: {isciSayisi + memurSayisi} Personel
-          </span>
-        </div>
-      </div>
-
-      {/* 2. MERKEZİ ARAMA BÖLÜMÜ VE EYLEMLER */}
-      <div className="bg-white border-b border-[#cbd5e1] p-4 shadow-sm">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+    <div className="flex-1 flex flex-col h-full bg-slate-100 font-sans text-xs overflow-hidden select-none">
+      {/* 1. MERKEZİ ARAMA BÖLÜMÜ VE EYLEMLER (Tekrarlanan başlık kaldırıldı) */}
+      <div className="bg-white border-b border-slate-200 px-4 py-3 shadow-xs">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Arama Alanı ve Kriter Seçici */}
           <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             {/* Kriter Dropdown */}
-            <div className="relative min-w-[170px]">
-              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+            <div className="relative min-w-[180px]">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
                 <Filter className="w-3.5 h-3.5" />
               </div>
               <select
                 id="select-arama-kriteri"
                 value={aramaKriteri}
                 onChange={(e) => setAramaKriteri(e.target.value as AramaKriteri)}
-                className="w-full bg-[#f8fafc] border-2 border-[#94a3b8] rounded-md pl-8 pr-3 py-2 text-xs font-bold text-gray-800 focus:outline-none focus:border-blue-600 shadow-inner cursor-pointer"
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs cursor-pointer"
               >
                 <option value="hepsi">🔍 Tüm Alanlarda Ara</option>
                 <option value="adSoyad">👤 Ad veya Soyad</option>
@@ -210,7 +169,7 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
 
             {/* Arama Giriş Kutusu */}
             <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 id="input-arama-metni"
                 type="text"
@@ -220,13 +179,13 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
                 onKeyDown={handleKeyDown}
                 placeholder={`${
                   aktifGrup === 'ISCI' ? 'İşçi' : 'Memur'
-                } personel ara (Sicil, Ad, Soyad, TC No, Ünvan, Telefon)...`}
-                className="w-full bg-[#f8fafc] border-2 border-blue-600 rounded-md pl-10 pr-9 py-2 text-sm text-gray-900 placeholder:text-gray-400 font-medium focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-inner"
+                } personel ara (Sicil no, isim, soyisim, TC no, unvan, telefon)...`}
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-10 pr-9 py-2 text-xs text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
               />
               {aramaMetni && (
                 <button
                   onClick={() => setAramaMetni('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 font-bold text-sm w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 font-bold text-sm w-5 h-5 flex items-center justify-center rounded-full hover:bg-slate-200 cursor-pointer"
                   title="Aramayı Temizle"
                 >
                   ×
@@ -241,19 +200,19 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
             <button
               id="btn-yeni-personel-ekle"
               onClick={onYeniPersonelEkle}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md shadow-sm border border-emerald-800 flex items-center justify-center space-x-2 cursor-pointer transition-all active:scale-95"
-              title="Formu boş halde açarak yeni personel kaydet"
+              className="flex-1 sm:flex-none px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs flex items-center justify-center space-x-1.5 cursor-pointer transition-colors active:scale-98"
+              title="Yeni personel eklemek için boş form aç"
             >
               <UserPlus className="w-4 h-4" />
-              <span>Personel Ekle</span>
+              <span>+ Personel Ekle</span>
             </button>
 
-            {/* Genel Liste Seçeneği (Basınca Tüm Liste Gelsin) */}
+            {/* Genel Liste Seçeneği */}
             <button
               id="btn-genel-liste-ac"
               onClick={onGenelListeAc}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-[#0055ea] hover:bg-[#0044bb] text-white font-bold rounded-md shadow-sm border border-blue-900 flex items-center justify-center space-x-2 cursor-pointer transition-all active:scale-95"
-              title="Tüm personel listesini resmi 10 sütunlu formatta açar"
+              className="flex-1 sm:flex-none px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-xs flex items-center justify-center space-x-1.5 cursor-pointer transition-colors active:scale-98"
+              title="Tüm personel listesini aç"
             >
               <Table className="w-4 h-4" />
               <span>Genel Liste</span>
@@ -262,15 +221,15 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
             {/* Hızlı Çıktı / Excel */}
             <button
               onClick={() => onResmiYazdir(aramaSonuclari)}
-              className="p-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md border border-gray-300 shadow-xs cursor-pointer"
+              className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-300 shadow-2xs cursor-pointer transition-colors"
               title="Mevcut arama sonuçlarını yazdır veya PDF olarak kaydet"
             >
-              <Printer className="w-4 h-4 text-blue-700" />
+              <Printer className="w-4 h-4 text-blue-600" />
             </button>
 
             <button
               onClick={onExcelExport}
-              className="p-2.5 bg-gray-100 hover:bg-emerald-50 text-emerald-700 rounded-md border border-gray-300 shadow-xs cursor-pointer"
+              className="p-2 bg-slate-50 hover:bg-emerald-50 text-emerald-700 rounded-lg border border-slate-300 shadow-2xs cursor-pointer transition-colors"
               title="Excel formatında indir"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
@@ -280,9 +239,9 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
       </div>
 
       {/* 3. ANA İÇERİK: ARAMA SONUÇ LİSTESİ VE SEÇİLİ PERSONEL BİLGİ DETAYI */}
-      <div className="flex-1 overflow-hidden p-3 md:p-4 flex flex-col lg:flex-row gap-4 max-w-7xl w-full mx-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden p-2.5 sm:p-3 md:p-4 flex flex-col lg:flex-row gap-3 md:gap-4 max-w-7xl w-full mx-auto">
         {/* SOL: ARAMA SONUÇLARI LİSTESİ */}
-        <div className="flex-1 bg-white border border-[#cbd5e1] rounded-lg shadow-sm flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-[300px] lg:min-h-0 bg-white border border-[#cbd5e1] rounded-lg shadow-sm flex flex-col overflow-hidden">
           {/* Liste Başlığı */}
           <div className="bg-[#f1f5f9] px-4 py-2.5 border-b border-[#cbd5e1] flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -468,13 +427,13 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
         </div>
 
         {/* SAĞ: SEÇİLİ PERSONEL BİLGİ KARTI VE HIZLI ERİŞİM */}
-        <div className="w-full lg:w-96 bg-white border border-[#cbd5e1] rounded-lg shadow-sm flex flex-col overflow-hidden">
+        <div className="w-full lg:w-80 xl:w-92 shrink-0 bg-white border border-[#cbd5e1] rounded-lg shadow-sm flex flex-col min-h-[380px] lg:min-h-0 overflow-hidden">
           {seciliPersonel ? (
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 min-h-0 flex flex-col h-full">
               {/* Kart Üst Başlık */}
-              <div className="bg-[#003366] text-white p-4">
+              <div className="bg-[#003366] text-white p-3 shrink-0">
                 <div className="flex items-center space-x-3">
-                  <div className="w-16 h-20 bg-slate-200 border-2 border-white rounded-md shadow-sm overflow-hidden flex items-center justify-center shrink-0">
+                  <div className="w-14 h-18 bg-slate-200 border-2 border-white rounded shadow-sm overflow-hidden flex items-center justify-center shrink-0">
                     {seciliPersonel.fotografUrl ? (
                       <img
                         src={seciliPersonel.fotografUrl}
@@ -482,23 +441,23 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="text-gray-400 text-center font-bold text-[10px] p-1">
+                      <div className="text-gray-400 text-center font-bold text-[9px] p-1">
                         FOTOĞRAF YOK
                       </div>
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <span className="inline-block px-2 py-0.5 rounded-xs text-[10px] font-bold uppercase tracking-wide bg-amber-400 text-blue-950 mb-1">
+                    <span className="inline-block px-2 py-0.5 rounded-xs text-[9.5px] font-bold uppercase tracking-wide bg-amber-400 text-blue-950 mb-0.5">
                       {seciliPersonel.personelTuru || 'ISCI'} PERSONEL
                     </span>
-                    <h3 className="text-base font-black text-white truncate">
+                    <h3 className="text-sm font-black text-white truncate">
                       {seciliPersonel.ad} {seciliPersonel.soyad}
                     </h3>
                     <p className="text-blue-200 font-semibold text-xs truncate">
                       {seciliPersonel.unvan || seciliPersonel.sanatKodu}
                     </p>
-                    <div className="flex items-center space-x-2 mt-1 text-[11px] font-mono text-yellow-300">
+                    <div className="flex items-center space-x-2 mt-0.5 text-[10.5px] font-mono text-yellow-300">
                       <span>Sicil: {seciliPersonel.sicilNo}</span>
                       <span>•</span>
                       <span>No: {seciliPersonel.personelNo || '-'}</span>
@@ -507,12 +466,12 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
                 </div>
               </div>
 
-              {/* Detay Bilgi Alanları */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#f8fafc] text-gray-800 text-xs">
+              {/* Detay Bilgi Alanları (Kaydırılabilir alan) */}
+              <div className="flex-1 min-h-0 p-2.5 sm:p-3 overflow-y-auto space-y-2 bg-[#f8fafc] text-gray-800 text-xs">
                 {/* T.C. Kimlik & Kan Grubu */}
-                <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-md border border-gray-200 shadow-xs">
+                <div className="grid grid-cols-2 gap-2 bg-white p-2 rounded-md border border-gray-200 shadow-2xs">
                   <div>
-                    <span className="text-[10px] text-gray-500 font-bold block flex items-center gap-1">
+                    <span className="text-[9.5px] text-gray-500 font-bold block flex items-center gap-1">
                       <CreditCard className="w-3 h-3 text-gray-400" /> TC KİMLİK NO
                     </span>
                     <span className="font-mono font-bold text-gray-900 text-xs">
@@ -520,7 +479,7 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-500 font-bold block">
+                    <span className="text-[9.5px] text-gray-500 font-bold block">
                       KAN GRUBU
                     </span>
                     <span className="font-bold text-rose-700 text-xs">
@@ -530,19 +489,19 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
                 </div>
 
                 {/* İletişim Telefonu */}
-                <div className="bg-white p-2.5 rounded-md border border-gray-200 shadow-xs">
-                  <span className="text-[10px] text-gray-500 font-bold block flex items-center gap-1">
+                <div className="bg-white p-2 rounded-md border border-gray-200 shadow-2xs">
+                  <span className="text-[9.5px] text-gray-500 font-bold block flex items-center gap-1">
                     <Phone className="w-3 h-3 text-emerald-600" /> TELEFON NUMARASI
                   </span>
-                  <span className="font-mono font-bold text-emerald-800 text-sm">
+                  <span className="font-mono font-bold text-emerald-800 text-xs sm:text-sm">
                     {seciliPersonel.cepTelefonu || '-'}
                   </span>
                 </div>
 
                 {/* Görev & Birim */}
-                <div className="bg-white p-2.5 rounded-md border border-gray-200 shadow-xs space-y-1.5">
+                <div className="bg-white p-2 rounded-md border border-gray-200 shadow-2xs space-y-1">
                   <div>
-                    <span className="text-[10px] text-gray-500 font-bold block flex items-center gap-1">
+                    <span className="text-[9.5px] text-gray-500 font-bold block flex items-center gap-1">
                       <Building className="w-3 h-3 text-blue-600" /> ÇALIŞTIĞI BİRİM / SERVİS
                     </span>
                     <span className="font-semibold text-gray-900 text-xs">
@@ -550,7 +509,7 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-500 font-bold block">
+                    <span className="text-[9.5px] text-gray-500 font-bold block">
                       POSTASI / GÖREVİ
                     </span>
                     <span className="text-gray-800 text-xs">
@@ -560,9 +519,9 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
                 </div>
 
                 {/* Doğum & İşe Giriş */}
-                <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-md border border-gray-200 shadow-xs">
+                <div className="grid grid-cols-2 gap-2 bg-white p-2 rounded-md border border-gray-200 shadow-2xs">
                   <div>
-                    <span className="text-[10px] text-gray-500 font-bold block flex items-center gap-1">
+                    <span className="text-[9.5px] text-gray-500 font-bold block flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-gray-400" /> DOĞUM TARİHİ
                     </span>
                     <span className="text-gray-800 font-medium text-xs">
@@ -570,7 +529,7 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-500 font-bold block flex items-center gap-1">
+                    <span className="text-[9.5px] text-gray-500 font-bold block flex items-center gap-1">
                       <Briefcase className="w-3 h-3 text-gray-400" /> İŞE GİRİŞ
                     </span>
                     <span className="text-gray-800 font-medium text-xs">
@@ -580,31 +539,32 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
                 </div>
 
                 {/* İkamet Adresi */}
-                <div className="bg-white p-2.5 rounded-md border border-gray-200 shadow-xs">
-                  <span className="text-[10px] text-gray-500 font-bold block flex items-center gap-1">
+                <div className="bg-white p-2 rounded-md border border-gray-200 shadow-2xs">
+                  <span className="text-[9.5px] text-gray-500 font-bold block flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-red-500" /> İKAMET ADRESİ
                   </span>
-                  <span className="text-gray-700 text-xs leading-relaxed block mt-0.5">
+                  <span className="text-gray-700 text-xs leading-relaxed block mt-0.5 line-clamp-3">
                     {seciliPersonel.adres || '-'}
                   </span>
                 </div>
               </div>
 
-              {/* Kart Eylem Butonları */}
-              <div className="p-3 bg-white border-t border-gray-200 flex flex-col space-y-2">
+              {/* Kart Eylem Butonları (Her Zaman Sabit ve Görünür) */}
+              <div className="shrink-0 p-2.5 bg-white border-t border-gray-200 flex flex-col gap-1.5 shadow-xs">
                 <button
                   id="btn-kisi-formda-ac"
                   onClick={() => onPersonelSecVeFormAc(seciliPersonel.id)}
-                  className="w-full py-2.5 bg-[#0055ea] hover:bg-[#0044bb] text-white font-black rounded-md shadow-md flex items-center justify-center space-x-2 text-xs cursor-pointer transition-all active:scale-95"
+                  className="w-full py-2 bg-[#0055ea] hover:bg-[#0044bb] text-white font-bold rounded-md shadow-xs flex items-center justify-center space-x-1.5 text-xs cursor-pointer transition-all active:scale-98"
+                  title="Personelin tüm bilgilerini formda aç"
                 >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>Kişinin Bilgilerini Formda Aç (Düzenle)</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Personel Özlük Formunu Aç</span>
                 </button>
 
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => onResmiYazdir(undefined, seciliPersonel)}
-                    className="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-md border border-gray-300 text-xs flex items-center justify-center space-x-1 cursor-pointer"
+                    className="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-md border border-gray-300 text-xs flex items-center justify-center space-x-1 cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5 text-blue-700" />
                     <span>Özlük Kartı Yazdır</span>

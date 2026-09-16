@@ -47,82 +47,101 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
   memurSayisi,
 }) => {
   return (
-    <div className="bg-[#ece9d8] border-b border-[#7f9db9] text-gray-800 select-none shadow-xs font-sans text-xs">
-      {/* 1. TEK TAB: İŞÇİ / MEMUR KATEGORİSİ (Kullanıcı Talebi: İki adet tab'a gerek yok, bir tane yeter) */}
-      <div className="bg-[#1f3a60] px-3 py-1.5 flex items-center justify-between border-b border-[#142844]">
-        <div className="flex items-center space-x-2">
-          <button
-            id="single-tab-kategori"
-            onClick={() => onGrupDegistir(aktifGrup === 'ISCI' ? 'MEMUR' : 'ISCI')}
-            className="px-4 py-1.5 text-xs md:text-sm font-black rounded-md flex items-center space-x-2.5 bg-[#ece9d8] text-[#003366] hover:bg-white shadow-md cursor-pointer border-2 border-[#0055ea] transition-all group"
-            title="Tıklayarak İŞÇİ ve MEMUR kadroları arasında geçiş yapabilirsiniz"
-          >
-            {aktifGrup === 'ISCI' ? (
-              <Users className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform" />
-            ) : (
-              <Briefcase className="w-4 h-4 text-cyan-600 group-hover:scale-110 transition-transform" />
-            )}
-            <span className="text-[11px] text-gray-500 font-semibold">Kategori:</span>
-            <span className="text-sm font-black tracking-wider text-blue-950">
-              {aktifGrup === 'ISCI' ? 'İŞÇİ' : 'MEMUR'}
-            </span>
-            <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-blue-800 text-white">
-              {aktifGrup === 'ISCI' ? `${isciSayisi} Kişi` : `${memurSayisi} Kişi`}
-            </span>
-            <span className="text-[11px] text-blue-700 underline font-normal ml-1 flex items-center gap-1 group-hover:text-blue-900">
-              <RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-300" />
-              <span>({aktifGrup === 'ISCI' ? "Memur'a Geç" : "İşçi'ye Geç"})</span>
-            </span>
-          </button>
+    <div className="bg-white border-b border-slate-200 text-slate-800 select-none shadow-xs font-sans text-xs">
+      {/* 1. KATEGORİ SEÇİCİ & KURUMSAL BİLGİ BARI */}
+      <div className="bg-[#102a45] px-4 py-2 flex items-center justify-between text-white border-b border-slate-700/60 shadow-sm">
+        <div className="flex items-center space-x-3">
+          <span className="text-[11px] font-semibold text-slate-300 hidden sm:inline uppercase tracking-wider">
+            Kadro Grubu:
+          </span>
+
+          {/* İŞÇİ / MEMUR SEGMENTED PILL SWITCHER */}
+          <div className="flex items-center bg-slate-900/80 p-1 rounded-lg border border-slate-700/80 shadow-inner">
+            <button
+              id="tab-isci-sec"
+              onClick={() => onGrupDegistir('ISCI')}
+              className={`px-3 py-1 text-xs font-bold rounded-md flex items-center space-x-1.5 transition-all cursor-pointer ${
+                aktifGrup === 'ISCI'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-amber-300" />
+              <span>İŞÇİ PERSONEL</span>
+              <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-mono font-bold ml-1 ${
+                aktifGrup === 'ISCI' ? 'bg-blue-900/80 text-amber-300' : 'bg-slate-800 text-slate-400'
+              }`}>
+                {isciSayisi}
+              </span>
+            </button>
+
+            <button
+              id="tab-memur-sec"
+              onClick={() => onGrupDegistir('MEMUR')}
+              className={`px-3 py-1 text-xs font-bold rounded-md flex items-center space-x-1.5 transition-all cursor-pointer ml-1 ${
+                aktifGrup === 'MEMUR'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Briefcase className="w-3.5 h-3.5 text-cyan-300" />
+              <span>MEMUR PERSONEL</span>
+              <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-mono font-bold ml-1 ${
+                aktifGrup === 'MEMUR' ? 'bg-blue-900/80 text-cyan-300' : 'bg-slate-800 text-slate-400'
+              }`}>
+                {memurSayisi}
+              </span>
+            </button>
+          </div>
         </div>
 
-        {/* Sağ: Genel Toplam */}
-        <div className="hidden sm:flex items-center space-x-2 text-white/90 text-xs font-semibold pr-2">
-          <span className="text-blue-200">Kayıtlı:</span>
-          <span className="bg-blue-950 text-white px-2 py-0.5 rounded font-mono font-bold">
-            {isciSayisi} İşçi + {memurSayisi} Memur (Toplam {isciSayisi + memurSayisi})
+        {/* Sağ: Toplam Kayıt Bilgisi */}
+        <div className="flex items-center space-x-2 text-xs font-medium text-slate-300 pr-1">
+          <span className="hidden md:inline text-slate-400">Toplam Mevcut:</span>
+          <span className="bg-slate-800/90 text-slate-200 border border-slate-700 px-2.5 py-0.5 rounded-full font-mono font-bold text-[11px]">
+            {isciSayisi + memurSayisi} Personel
           </span>
         </div>
       </div>
 
-      {/* 2. EKRAN GEZİNME BUTONLARI (Arama, Ekleme, Genel Liste, Form, Yedekleme) */}
-      <div className="flex items-center px-2 pt-1 space-x-1 border-b border-[#d4d0c8] bg-[#e6e2d3]">
-        {/* Arama Ekranı (Varsayılan Açılış Ekranı) */}
+      {/* 2. EKRAN SEKMELERİ (Arama, Ekleme, Genel Liste, Form, Yedekleme) */}
+      <div className="flex items-center px-4 pt-1.5 space-x-1.5 border-b border-slate-200 bg-slate-50">
+        {/* Arama Ekranı */}
         <button
           id="nav-tab-arama"
           onClick={() => setActiveTab('arama')}
-          className={`px-3 py-1.5 text-xs font-bold rounded-t-xs flex items-center space-x-1.5 transition-all cursor-pointer ${
+          className={`px-3.5 py-2 text-xs font-bold rounded-t-lg flex items-center space-x-1.5 transition-all cursor-pointer border-t-2 ${
             activeTab === 'arama'
-              ? 'bg-[#ece9d8] text-blue-900 border-t-2 border-t-blue-700 border-x border-[#7f9db9] -mb-[1px] shadow-xs'
-              : 'text-gray-700 hover:text-black hover:bg-[#dfdbcb]'
+              ? 'bg-white text-blue-700 border-t-blue-600 border-x border-slate-200 -mb-[1px] shadow-xs'
+              : 'border-t-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Search className="w-3.5 h-3.5 text-blue-700" />
-          <span>Arama & Sorgulama</span>
+          <Search className="w-3.5 h-3.5 text-blue-600" />
+          <span>Arama &amp; Sorgulama</span>
         </button>
 
         {/* Personel Ekle (Boş Form Modu) */}
         <button
           id="nav-tab-personel-ekle"
           onClick={onYeniPersonelEkle}
-          className="px-3 py-1.5 text-xs font-bold rounded-t-xs flex items-center space-x-1.5 transition-all cursor-pointer text-emerald-800 hover:text-emerald-950 hover:bg-[#d5eedf] border border-emerald-300 bg-[#e7f7ed]"
-          title="Formu boş halde açarak yeni personel ekleyin"
+          className="px-3.5 py-2 text-xs font-bold rounded-t-lg flex items-center space-x-1.5 transition-all cursor-pointer text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100/70 border border-emerald-300/80 bg-emerald-50 shadow-xs"
+          title="Yeni personel eklemek için boş formu açın"
         >
-          <UserPlus className="w-3.5 h-3.5 text-emerald-700" />
-          <span>+ Personel Ekle</span>
+          <UserPlus className="w-3.5 h-3.5 text-emerald-600" />
+          <span>+ Yeni Personel Ekle</span>
         </button>
 
         {/* Genel Liste */}
         <button
           id="nav-tab-genel-liste"
           onClick={() => setActiveTab('genel_liste')}
-          className={`px-3 py-1.5 text-xs font-bold rounded-t-xs flex items-center space-x-1.5 transition-all cursor-pointer ${
+          className={`px-3.5 py-2 text-xs font-bold rounded-t-lg flex items-center space-x-1.5 transition-all cursor-pointer border-t-2 ${
             activeTab === 'genel_liste'
-              ? 'bg-[#ece9d8] text-blue-900 border-t-2 border-t-blue-700 border-x border-[#7f9db9] -mb-[1px] shadow-xs'
-              : 'text-gray-700 hover:text-black hover:bg-[#dfdbcb]'
+              ? 'bg-white text-blue-700 border-t-blue-600 border-x border-slate-200 -mb-[1px] shadow-xs'
+              : 'border-t-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Table className="w-3.5 h-3.5 text-indigo-700" />
+          <Table className="w-3.5 h-3.5 text-indigo-600" />
           <span>Genel Liste (10 Sütun)</span>
         </button>
 
@@ -130,13 +149,13 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
         <button
           id="nav-tab-tcdd-form"
           onClick={() => setActiveTab('tcdd_form')}
-          className={`px-3 py-1.5 text-xs font-bold rounded-t-xs flex items-center space-x-1.5 transition-all cursor-pointer ${
+          className={`px-3.5 py-2 text-xs font-bold rounded-t-lg flex items-center space-x-1.5 transition-all cursor-pointer border-t-2 ${
             activeTab === 'tcdd_form'
-              ? 'bg-[#ece9d8] text-blue-900 border-t-2 border-t-blue-700 border-x border-[#7f9db9] -mb-[1px] shadow-xs'
-              : 'text-gray-700 hover:text-black hover:bg-[#dfdbcb]'
+              ? 'bg-white text-blue-700 border-t-blue-600 border-x border-slate-200 -mb-[1px] shadow-xs'
+              : 'border-t-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <FolderOpen className="w-3.5 h-3.5 text-blue-800" />
+          <FolderOpen className="w-3.5 h-3.5 text-blue-700" />
           <span>Personel Özlük Formu</span>
         </button>
 
@@ -144,37 +163,37 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
         <button
           id="nav-tab-yedekleme"
           onClick={() => setActiveTab('yedekleme')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-t-xs flex items-center space-x-1.5 transition-all cursor-pointer ${
+          className={`px-3.5 py-2 text-xs font-bold rounded-t-lg flex items-center space-x-1.5 transition-all cursor-pointer border-t-2 ${
             activeTab === 'yedekleme'
-              ? 'bg-[#ece9d8] text-blue-900 border-t-2 border-t-blue-700 border-x border-[#7f9db9] -mb-[1px] shadow-xs'
-              : 'text-gray-700 hover:text-black hover:bg-[#dfdbcb]'
+              ? 'bg-white text-blue-700 border-t-blue-600 border-x border-slate-200 -mb-[1px] shadow-xs'
+              : 'border-t-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Database className="w-3.5 h-3.5 text-purple-700" />
+          <Database className="w-3.5 h-3.5 text-purple-600" />
           <span>Yedekle - Yükle</span>
         </button>
       </div>
 
-      {/* 3. TOOLBAR İŞLEM BUTONLARI */}
-      <div className="bg-[#f5f4ef] px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 border-b border-[#d8d4c8]">
-        <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-          {/* Resmi Yazdır / PDF Çıktısı (Türkçe Karakter Uyumlu) */}
+      {/* 3. MODERN İŞLEM TOOLBARI */}
+      <div className="bg-white px-4 py-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 shadow-xs">
+        <div className="flex items-center space-x-2 flex-wrap gap-y-1.5">
+          {/* Resmi Yazdır / PDF Çıktısı */}
           <button
             id="btn-resmi-yazdir"
             onClick={onResmiYazdir}
-            title="Resmi TCDD Raporunu Görüntüle, Yazdır ve PDF Olarak Kaydet"
-            className="px-2.5 py-1 rounded-xs text-[11px] font-bold flex items-center space-x-1.5 border border-[#7f9db9] bg-[#ece9d8] hover:bg-[#dfdbcb] text-blue-900 cursor-pointer shadow-xs"
+            title="Resmi TCDD Raporunu Görüntüle ve Yazdır"
+            className="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 cursor-pointer shadow-xs transition-colors"
           >
             <Printer className="w-3.5 h-3.5 text-blue-700" />
-            <span>Resmi Yazdır / PDF Dökümü</span>
+            <span>Resmi Yazdır / Döküm</span>
           </button>
 
           {/* Dışa Aktarma Butonları */}
           <button
             id="btn-excel-aktar"
             onClick={onExcelExport}
-            title="Personel Listesini Excel (.xlsx) Olarak İndir"
-            className="px-2.5 py-1 rounded-xs text-[11px] font-medium flex items-center space-x-1.5 border border-[#7f9db9] bg-[#ece9d8] hover:bg-[#dfdbcb] text-emerald-900 cursor-pointer shadow-xs"
+            title={`${aktifGrup === 'ISCI' ? 'İŞÇİ LİSTE' : 'MEMUR LİSTE'} Excel (.xlsx) İndir`}
+            className="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 cursor-pointer shadow-xs transition-colors"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
             <span>Excel'e Aktar (.xlsx)</span>
@@ -183,14 +202,14 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
           <button
             id="btn-pdf-aktar"
             onClick={onPdfExport}
-            title="Personel Listesini Doğrudan PDF Olarak İndir"
-            className="px-2.5 py-1 rounded-xs text-[11px] font-medium flex items-center space-x-1.5 border border-[#7f9db9] bg-[#ece9d8] hover:bg-[#dfdbcb] text-rose-900 cursor-pointer shadow-xs"
+            title={`${aktifGrup === 'ISCI' ? 'İŞÇİ LİSTE' : 'MEMUR LİSTE'} PDF İndir`}
+            className="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 cursor-pointer shadow-xs transition-colors"
           >
             <FileText className="w-3.5 h-3.5 text-rose-600" />
             <span>PDF İndir</span>
           </button>
 
-          <div className="h-4 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+          <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block"></div>
 
           {/* Hızlı Yedek Al */}
           <button
@@ -199,11 +218,11 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
               setActiveTab('yedekleme');
               onQuickBackup();
             }}
-            title="Veritabanını Yedekle ve Yükle Paneli"
-            className="px-2.5 py-1 rounded-xs text-[11px] font-medium flex items-center space-x-1.5 border border-[#7f9db9] bg-[#ece9d8] hover:bg-[#dfdbcb] text-amber-900 cursor-pointer shadow-xs"
+            title="Veritabanı Yedekleme ve Geri Yükleme"
+            className="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer shadow-xs transition-colors"
           >
             <Save className="w-3.5 h-3.5 text-amber-600" />
-            <span>Yedekle - Yükle (.tcddbak)</span>
+            <span>Yedek Al / Yükle (.tcddbak)</span>
           </button>
         </div>
 
@@ -213,9 +232,9 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
             id="btn-yenile"
             onClick={onRefresh}
             title="Verileri Merkezi Sunucu ile Yenile (F5)"
-            className="p-1 rounded-xs text-gray-700 hover:text-black hover:bg-[#dfdbcb] border border-[#7f9db9] transition-all text-[11px] flex items-center gap-1 cursor-pointer bg-[#ece9d8] shadow-xs"
+            className="px-2.5 py-1.5 rounded-md text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-300 transition-colors text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <RefreshCw className="w-3 h-3 text-gray-600" />
+            <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
             <span>Yenile (F5)</span>
           </button>
         </div>
