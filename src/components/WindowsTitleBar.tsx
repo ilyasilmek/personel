@@ -1,21 +1,45 @@
-import React from 'react';
-import { Minus, Square, X, Database, ShieldCheck, Bell, BellOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Database, Bell, BellOff, Maximize, Minimize } from 'lucide-react';
 
 interface WindowsTitleBarProps {
-  isMaximized: boolean;
-  onToggleMaximize: () => void;
+  isMaximized?: boolean;
+  onToggleMaximize?: () => void;
   isOnline?: boolean;
   bildirimlerAktif?: boolean;
   onToggleBildirimler?: () => void;
 }
 
 export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
-  isMaximized,
-  onToggleMaximize,
   isOnline = true,
   bildirimlerAktif = true,
   onToggleBildirimler,
 }) => {
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
+    return typeof document !== 'undefined' && !!document.fullscreenElement;
+  });
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.warn('Tam ekran geçişi desteklenmiyor veya engellendi:', err);
+    }
+  };
+
   return (
     <header
       id="windows-titlebar"
@@ -33,7 +57,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
         </div>
       </div>
 
-      {/* Sağ: Merkezi Veritabanı Durumu, Bildirim Ayarı & Pencere Kontrolleri */}
+      {/* Sağ: Bildirim Ayarı, Merkezi Veritabanı Durumu & Tam Ekran Butonu */}
       <div className="flex items-center space-x-2.5">
         {/* Bildirim Aç/Kapat Butonu */}
         {onToggleBildirimler && (
@@ -67,29 +91,24 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
           <span className="font-medium">{isOnline ? 'Merkezi Veritabanı: Çevrimiçi' : 'Yerel Mod'}</span>
         </div>
 
-        {/* Windows Pencere Kontrol Butonları */}
-        <div className="flex items-center -mr-1 space-x-0.5">
-          <button
-            title="Simge Durumuna Küçült"
-            className="h-6 w-8 rounded flex items-center justify-center hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={onToggleMaximize}
-            title={isMaximized ? 'Geri Getir' : 'Ekranı Kapla'}
-            className="h-6 w-8 rounded flex items-center justify-center hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
-          >
-            <Square className="w-3 h-3" />
-          </button>
-          <button
-            title="Kapat"
-            onClick={() => {}}
-            className="h-6 w-8 rounded flex items-center justify-center hover:bg-rose-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        {/* Tam Ekran / Pencere Kontrol Butonu (Üstteki Windows çubuğunu gizler/gösterir) */}
+        <button
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'Tam Ekrandan Çık (Pencere Modu)' : 'Tam Ekran Yap (Üstteki Windows Çubuğunu Gizler - F11)'}
+          className="flex items-center space-x-1 px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer text-[11px] font-medium"
+        >
+          {isFullscreen ? (
+            <>
+              <Minimize className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">Pencereye Dön</span>
+            </>
+          ) : (
+            <>
+              <Maximize className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">Tam Ekran</span>
+            </>
+          )}
+        </button>
       </div>
     </header>
   );
