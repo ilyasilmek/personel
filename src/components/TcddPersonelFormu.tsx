@@ -56,6 +56,36 @@ interface TcddPersonelFormuProps {
   onGenelListeAc?: () => void;
 }
 
+export function createEmptyPersonel(tur: PersonelTuru = 'ISCI'): Personel {
+  return {
+    id: `tcdd-${Date.now()}`,
+    personelTuru: tur,
+    tcKimlik: '',
+    personelNo: '',
+    sicilNo: '',
+    ad: '',
+    soyad: '',
+    cinsiyet: 'Erkek',
+    dogumYeri: '',
+    dogumTarihi: '',
+    medeniHal: 'Bekar',
+    bitirdigiOkul: '',
+    bolumu: '',
+    kanGrubu: '',
+    iseGirisTarihi: '',
+    sanatKodu: '',
+    unvan: '',
+    postasi: '',
+    calistigiBirim: 'Vagon Bakım Onarım Atelye Müdürlüğü',
+    cepTelefonu: '',
+    adres: '',
+    fotografUrl: '',
+    egitimlerVeKurslar: [],
+    evraklar: [],
+    olusturmaTarihi: new Date().toISOString(),
+  };
+}
+
 export function TcddPersonelFormu({
   personeller,
   onPersonelKaydet,
@@ -81,22 +111,28 @@ export function TcddPersonelFormu({
   const [duzenlemeModu, setDuzenlemeModu] = useState<boolean>(isBosFormMode);
   const [isNewRecord, setIsNewRecord] = useState<boolean>(isBosFormMode);
 
-  // Form State
+  // Form State - Güvenli ilk değer ataması
   const [formData, setFormData] = useState<Personel>(() => {
     if (isBosFormMode) {
-      return getEmptyPersonel();
+      return createEmptyPersonel(aktifGrup);
     }
-    const p = personeller.find(x => x.id === seciliId) || personeller[0] || getEmptyPersonel();
-    return { ...p };
+    const targetId = seciliPersonelId || seciliId;
+    const p = personeller.find(x => x.id === targetId) || personeller[0] || createEmptyPersonel(aktifGrup);
+    return {
+      ...p,
+      personelTuru: p.personelTuru || aktifGrup,
+      evraklar: p.evraklar || [],
+      egitimlerVeKurslar: p.egitimlerVeKurslar || [],
+    };
   });
 
   // isBosFormMode değiştiğinde formu boşalt ve yeni kayıt moduna al
   useEffect(() => {
     if (isBosFormMode) {
-      const empty = getEmptyPersonel();
-      setFormData(empty);
+      setFormData(createEmptyPersonel(aktifGrup));
       setIsNewRecord(true);
       setDuzenlemeModu(true);
+      setSeciliId('');
     }
   }, [isBosFormMode, aktifGrup]);
 
@@ -106,12 +142,17 @@ export function TcddPersonelFormu({
       setSeciliId(seciliPersonelId);
       const target = personeller.find(p => p.id === seciliPersonelId);
       if (target) {
-        setFormData({ ...target });
+        setFormData({
+          ...target,
+          personelTuru: target.personelTuru || aktifGrup,
+          evraklar: target.evraklar || [],
+          egitimlerVeKurslar: target.egitimlerVeKurslar || [],
+        });
         setIsNewRecord(false);
         setDuzenlemeModu(false);
       }
     }
-  }, [seciliPersonelId, isBosFormMode]);
+  }, [seciliPersonelId, isBosFormMode, aktifGrup, personeller, seciliId]);
 
   // Arama ve filtre
   const [aramaMetni, setAramaMetni] = useState('');
@@ -127,8 +168,6 @@ export function TcddPersonelFormu({
   const prevSeciliIdRef = useRef<string | null>(seciliId);
 
   // Seçili personel ID'si değiştiğinde form verisini güncelle.
-  // DİKKAT: Kullanıcı düzenleme modundayken (veya yeni kayıt modundayken) arka plan senkronizasyonunun
-  // düzenleme modunu kapatmasını ve kullanıcının formda yazdığı değişiklikleri ezmesini engelliyoruz!
   useEffect(() => {
     const idDegisti = prevSeciliIdRef.current !== seciliId;
     prevSeciliIdRef.current = seciliId;
@@ -144,43 +183,18 @@ export function TcddPersonelFormu({
 
     const aktif = personeller.find(p => p.id === seciliId);
     if (aktif) {
-      setFormData({ ...aktif });
+      setFormData({
+        ...aktif,
+        personelTuru: aktif.personelTuru || aktifGrup,
+        evraklar: aktif.evraklar || [],
+        egitimlerVeKurslar: aktif.egitimlerVeKurslar || [],
+      });
       setManuelBolumGirisi(false);
       if (idDegisti) {
         setDuzenlemeModu(false);
       }
     }
-  }, [seciliId, personeller, isNewRecord, duzenlemeModu]);
-
-  function getEmptyPersonel(belirlenenTur?: PersonelTuru): Personel {
-    return {
-      id: `tcdd-${Date.now()}`,
-      personelTuru: belirlenenTur || (formData?.personelTuru ? formData.personelTuru : aktifGrup) || 'ISCI',
-      tcKimlik: '',
-      personelNo: '',
-      sicilNo: '',
-      ad: '',
-      soyad: '',
-      cinsiyet: 'Erkek',
-      dogumYeri: '',
-      dogumTarihi: '',
-      medeniHal: 'Bekar',
-      bitirdigiOkul: '',
-      bolumu: '',
-      kanGrubu: '',
-      iseGirisTarihi: '',
-      sanatKodu: '',
-      unvan: '',
-      postasi: '',
-      calistigiBirim: 'Vagon Bakım Onarım Atelye Müdürlüğü',
-      cepTelefonu: '',
-      adres: '',
-      fotografUrl: '',
-      egitimlerVeKurslar: [],
-      evraklar: [],
-      olusturmaTarihi: new Date().toISOString(),
-    };
-  }
+  }, [seciliId, personeller, isNewRecord, duzenlemeModu, aktifGrup]);
 
   // Filtrelenmiş liste (Türkçe büyük/küçük harf duyarsız arama)
   const filtrelenmisPersoneller = personeller.filter(p => {
@@ -236,10 +250,11 @@ export function TcddPersonelFormu({
 
   // Yeni Ekle
   const handleYeniEkle = () => {
-    const yeni = getEmptyPersonel(formData.personelTuru || aktifGrup);
+    const yeni = createEmptyPersonel(formData?.personelTuru || aktifGrup);
     setFormData(yeni);
     setIsNewRecord(true);
     setDuzenlemeModu(true);
+    setSeciliId('');
     showToast(`Yeni ${yeni.personelTuru === 'MEMUR' ? 'Memur' : 'İşçi'} personel formu açıldı. Bilgileri girip [Kaydet] butonuna basınız.`);
   };
 

@@ -78,7 +78,7 @@ export interface Personel {
   maas?: number;
   departman?: string;
   pozisyon?: string;
-  durum?: 'Aktif' | 'İzinli' | 'Ayrıldı';
+  durum?: DurumTuru;
   olusturmaTarihi: string;
 
   // Uyumluluk Alanları
@@ -86,6 +86,9 @@ export interface Personel {
   telefon?: string;
   sehir?: string;
   email?: string;
+  acilKisi?: string;
+  acilTelefon?: string;
+  notlar?: string;
 }
 
 export interface VeritabaniYedek {

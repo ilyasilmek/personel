@@ -125,15 +125,24 @@ export const PersonelModal: React.FC<PersonelModalProps> = ({
     onKaydet(
       {
         tcKimlik: tcKimlik.trim(),
+        sicilNo: duzenlenecekPersonel?.sicilNo || `S-${Date.now().toString().slice(-6)}`,
+        personelNo: duzenlenecekPersonel?.personelNo || '',
         ad: ad.trim(),
         soyad: soyad.trim(),
         email: email.trim() || `${ad.toLowerCase()}.${soyad.toLowerCase()}@kurum.com.tr`,
         telefon: telefon.trim() || '0555 000 00 00',
+        cepTelefonu: telefon.trim() || '0555 000 00 00',
         departman,
         pozisyon: pozisyon.trim(),
+        sanatKodu: pozisyon.trim(),
+        calistigiBirim: departman || 'Vagon Bakım Onarım Atelye Müdürlüğü',
         maas: Number(maas),
         iseGirisTarihi,
         dogumTarihi,
+        dogumYeri: duzenlenecekPersonel?.dogumYeri || 'Ankara',
+        medeniHal: duzenlenecekPersonel?.medeniHal || 'Bekar',
+        bitirdigiOkul: egitimDurumu || 'Lise',
+        bolumu: duzenlenecekPersonel?.bolumu || '',
         kanGrubu,
         durum,
         cinsiyet,
@@ -143,6 +152,8 @@ export const PersonelModal: React.FC<PersonelModalProps> = ({
         acilKisi: acilKisi.trim(),
         acilTelefon: acilTelefon.trim(),
         notlar: notlar.trim(),
+        egitimlerVeKurslar: duzenlenecekPersonel?.egitimlerVeKurslar || [],
+        evraklar: duzenlenecekPersonel?.evraklar || [],
       },
       duzenlenecekPersonel ? duzenlenecekPersonel.id : undefined
     );
