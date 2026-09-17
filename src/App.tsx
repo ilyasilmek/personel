@@ -18,6 +18,12 @@ import {
   exportPersonnelToPdf,
   exportTcddBakFile,
 } from './utils/exportUtils';
+import {
+  getGitHubConfig,
+  isGitHubConfigured,
+  fetchFromGitHub,
+  pushToGitHub,
+} from './utils/githubSync';
 import { WindowsTitleBar } from './components/WindowsTitleBar';
 import { NavigationRibbon, ActiveTab } from './components/NavigationRibbon';
 import { PersonelAramaEkrani } from './components/PersonelAramaEkrani';
@@ -33,6 +39,11 @@ export default function App() {
   const [yedekler, setYedekler] = useState<VeritabaniYedek[]>(() => loadYedekler());
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [sonSenkronizasyon, setSonSenkronizasyon] = useState<string>('');
+
+  // GitHub Senkronizasyon Durumları
+  const [isGitHubActive, setIsGitHubActive] = useState<boolean>(() => isGitHubConfigured());
+  const [gitHubSyncStatus, setGitHubSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [gitHubLastSync, setGitHubLastSync] = useState<string>(() => getGitHubConfig().lastSyncTime || '');
 
   // UI Durumları
   // 1. Program açılışta sadece arama bölümü olsun (Varsayılan ekran: 'arama')
@@ -117,6 +128,48 @@ export default function App() {
     }
   }, []);
 
+  // 2. GitHub ile Senkronizasyon (Ortak Bulut Veritabanı - 5 Bilgisayar)
+  const syncFromGitHub = useCallback(async (isSilent = false) => {
+    const cfg = getGitHubConfig();
+    if (!isGitHubConfigured(cfg)) {
+      setIsGitHubActive(false);
+      return;
+    }
+    setIsGitHubActive(true);
+    setGitHubSyncStatus('syncing');
+
+    try {
+      const res = await fetchFromGitHub(cfg);
+      if (res.success && res.personeller && res.personeller.length > 0) {
+        setPersoneller((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(res.personeller)) {
+            return prev;
+          }
+          savePersoneller(res.personeller!);
+          savePersonellerOnline(res.personeller!);
+          return res.personeller!;
+        });
+        setGitHubSyncStatus('success');
+        const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+        setGitHubLastSync(nowStr);
+        if (!isSilent) {
+          showToast(`GitHub'dan ${res.personeller.length} personel kaydı başarıyla eşitlendi.`);
+        }
+      } else if (res.isEmpty) {
+        setGitHubSyncStatus('success');
+      } else {
+        setGitHubSyncStatus('error');
+        if (!isSilent && res.message) {
+          showToast(`GitHub: ${res.message}`);
+        }
+      }
+    } catch (err: any) {
+      console.warn('GitHub senkronizasyon hatası:', err);
+      setGitHubSyncStatus('error');
+    }
+  }, []);
+
+  // Program açılışında ve düzenli aralıklarla senkronizasyon
   useEffect(() => {
     syncFromServer(true);
     const interval = setInterval(() => {
@@ -125,7 +178,24 @@ export default function App() {
     return () => clearInterval(interval);
   }, [syncFromServer]);
 
-  const persistPersoneller = async (newList: Personel[]) => {
+  // Program açılışında ve periyodik olarak GitHub kontrolü
+  useEffect(() => {
+    const cfg = getGitHubConfig();
+    if (isGitHubConfigured(cfg) && cfg.autoSyncOnStart) {
+      syncFromGitHub(true);
+    }
+
+    const ghInterval = setInterval(() => {
+      const currentCfg = getGitHubConfig();
+      if (isGitHubConfigured(currentCfg)) {
+        syncFromGitHub(true);
+      }
+    }, 30000);
+
+    return () => clearInterval(ghInterval);
+  }, [syncFromGitHub]);
+
+  const persistPersoneller = async (newList: Personel[], commitMesaji?: string) => {
     setPersoneller(newList);
     savePersoneller(newList);
     try {
@@ -138,6 +208,26 @@ export default function App() {
     } catch (err) {
       console.error('Merkezi sunucuya kaydetme hatası:', err);
       setIsOnline(false);
+    }
+
+    // GitHub Otomatik Push (Etkinse)
+    const cfg = getGitHubConfig();
+    if (isGitHubConfigured(cfg) && cfg.autoPushOnChange) {
+      setGitHubSyncStatus('syncing');
+      pushToGitHub(newList, commitMesaji || `Veri güncellemesi (${newList.length} Personel)`, cfg)
+        .then((res) => {
+          if (res.success) {
+            setGitHubSyncStatus('success');
+            const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            setGitHubLastSync(nowStr);
+          } else {
+            setGitHubSyncStatus('error');
+            console.warn('GitHub push uyarısı:', res.message);
+          }
+        })
+        .catch(() => {
+          setGitHubSyncStatus('error');
+        });
     }
   };
 
@@ -282,6 +372,9 @@ export default function App() {
           isOnline={isOnline}
           bildirimlerAktif={bildirimlerAktif}
           onToggleBildirimler={handleToggleBildirimler}
+          isGitHubActive={isGitHubActive}
+          gitHubSyncStatus={gitHubSyncStatus}
+          onTriggerGitHubSync={() => syncFromGitHub(false)}
         />
 
         {/* BÜYÜKÇE İKİ TANE TAB (İŞÇİ / MEMUR) VE NAVİGASYON ÇUBUĞU */}
@@ -392,9 +485,12 @@ export default function App() {
                 }}
                 onSifirla={handleReset}
                 onVeriYukle={(yeniListe) => {
-                  persistPersoneller(yeniListe);
+                  persistPersoneller(yeniListe, 'Yedek geri yüklendi');
                   showToast(`${yeniListe.length} personel kaydı başarıyla yüklendi ve senkronize edildi.`);
                 }}
+                onTriggerGitHubSync={() => syncFromGitHub(false)}
+                gitHubSyncStatus={gitHubSyncStatus}
+                gitHubLastSync={gitHubLastSync}
               />
             </div>
           )}
@@ -405,6 +501,8 @@ export default function App() {
           personelSayisi={personeller.length}
           sonSenkronizasyon={sonSenkronizasyon}
           isOnline={isOnline}
+          isGitHubActive={isGitHubActive}
+          gitHubLastSync={gitHubLastSync}
         />
       </div>
 

@@ -4,6 +4,33 @@ import { BASLANGIC_PERSONELLER, BASLANGIC_KULLANICILAR, BASLANGIC_YEDEKLER } fro
 const STORAGE_KEY_PERSONEL = 'tcdd_personel_data_v5';
 const STORAGE_KEY_KULLANICI = 'tcdd_kullanici_data_v5';
 const STORAGE_KEY_YEDEK = 'tcdd_yedek_data_v5';
+const STORAGE_KEY_CUSTOM_SERVER = 'tcdd_custom_server_url';
+
+export function getCustomServerUrl(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY_CUSTOM_SERVER) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setCustomServerUrl(url: string): void {
+  try {
+    const trimmed = url.trim().replace(/\/+$/, '');
+    if (!trimmed) {
+      localStorage.removeItem(STORAGE_KEY_CUSTOM_SERVER);
+    } else {
+      localStorage.setItem(STORAGE_KEY_CUSTOM_SERVER, trimmed);
+    }
+  } catch (err) {
+    console.error('Sunucu adresi kaydedilemedi:', err);
+  }
+}
+
+function getApiBaseUrl(): string {
+  const custom = getCustomServerUrl();
+  return custom ? custom : '';
+}
 
 export function loadPersoneller(): Personel[] {
   try {
@@ -41,7 +68,8 @@ export function savePersoneller(list: Personel[]): void {
  */
 export async function fetchPersonellerOnline(): Promise<Personel[]> {
   try {
-    const res = await fetch('/api/personeller');
+    const baseUrl = getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/personeller`);
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const data = await res.json();
     const list: Personel[] | null = Array.isArray(data)
@@ -61,13 +89,25 @@ export async function fetchPersonellerOnline(): Promise<Personel[]> {
 export async function savePersonellerOnline(list: Personel[]): Promise<void> {
   savePersoneller(list);
   try {
-    await fetch('/api/personeller', {
+    const baseUrl = getApiBaseUrl();
+    await fetch(`${baseUrl}/api/personeller`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(list),
     });
   } catch (err) {
     console.warn('Online sunucuya iletilemedi, yerel önbellekte saklandı:', err);
+  }
+}
+
+export async function fetchServerStatus(): Promise<any> {
+  try {
+    const baseUrl = getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/status`);
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    return null;
   }
 }
 

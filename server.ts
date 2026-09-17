@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { createServer as createViteServer } from 'vite';
 
 const app = express();
@@ -54,9 +55,23 @@ function writeDatabase(data: DbStructure): void {
 
 // ======================= API ENDPOINT'LERİ =======================
 
-// 1. Durum Kontrolü
+// 1. Durum ve Ağ Bilgisi Kontrolü (Atölye İçi Ortak Kullanım İçin IP Adresleri)
 app.get('/api/status', (req, res) => {
   const db = readDatabase();
+  const interfaces = os.networkInterfaces();
+  const localIps: string[] = [];
+
+  for (const name of Object.keys(interfaces)) {
+    const netList = interfaces[name];
+    if (netList) {
+      for (const net of netList) {
+        if (net.family === 'IPv4' && !net.internal) {
+          localIps.push(net.address);
+        }
+      }
+    }
+  }
+
   res.json({
     status: 'online',
     serverTime: new Date().toISOString(),
@@ -64,6 +79,9 @@ app.get('/api/status', (req, res) => {
     lastUpdated: db.lastUpdated,
     version: db.version,
     depolamaTuru: 'Merkezi Sunucu Dosya Veritabanı (Online Senkronize)',
+    port: PORT,
+    localIps,
+    hostname: os.hostname(),
   });
 });
 

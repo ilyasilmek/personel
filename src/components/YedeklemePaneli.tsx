@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Database,
   Download,
@@ -9,9 +9,33 @@ import {
   FileCode,
   RotateCcw,
   ShieldCheck,
+  ArrowRight,
+  Copy,
+  Check,
+  AlertCircle,
+  Github,
+  GitBranch,
+  Key,
+  Eye,
+  EyeOff,
+  CloudUpload,
+  CloudDownload,
+  HelpCircle,
+  Sparkles,
 } from 'lucide-react';
 import { Personel, VeritabaniYedek } from '../types';
 import { exportTcddBakFile } from '../utils/exportUtils';
+import {
+  getGitHubConfig,
+  saveGitHubConfig,
+  isGitHubConfigured,
+  testGitHubConnection,
+  fetchFromGitHub,
+  pushToGitHub,
+  generateSetupCode,
+  applySetupCode,
+  GitHubSyncConfig,
+} from '../utils/githubSync';
 
 interface YedeklemePaneliProps {
   personeller: Personel[];
@@ -19,6 +43,9 @@ interface YedeklemePaneliProps {
   onYedekEkle: (yedek: VeritabaniYedek) => void;
   onSifirla: () => void;
   onVeriYukle: (yeniPersoneller: Personel[]) => void;
+  onTriggerGitHubSync?: () => Promise<void>;
+  gitHubSyncStatus?: 'idle' | 'syncing' | 'success' | 'error';
+  gitHubLastSync?: string;
 }
 
 export const YedeklemePaneli: React.FC<YedeklemePaneliProps> = ({
@@ -27,9 +54,23 @@ export const YedeklemePaneli: React.FC<YedeklemePaneliProps> = ({
   onYedekEkle,
   onSifirla,
   onVeriYukle,
+  onTriggerGitHubSync,
+  gitHubSyncStatus = 'idle',
+  gitHubLastSync,
 }) => {
   const [yedekleniyor, setYedekleniyor] = useState(false);
   const [bildirim, setBildirim] = useState<string | null>(null);
+
+  // GitHub State
+  const [ghConfig, setGhConfig] = useState<GitHubSyncConfig>(() => getGitHubConfig());
+  const [ghTokenGoster, setGhTokenGoster] = useState(false);
+  const [ghTestYukleniyor, setGhTestYukleniyor] = useState(false);
+  const [ghTestSonuc, setGhTestSonuc] = useState<{ success: boolean; message: string } | null>(null);
+  const [ghSenkYukleniyor, setGhSenkYukleniyor] = useState(false);
+  const [ghKurulumKodu, setGhKurulumKodu] = useState('');
+  const [ghKoduKopyalandi, setGhKoduKopyalandi] = useState(false);
+  const [girilenKurulumKodu, setGirilenKurulumKodu] = useState('');
+  const [rehberAcik, setRehberAcik] = useState(false);
 
   // Tek ve En Uygun Saklama Biçimi ile Yedek Alma (.tcddbak)
   const handleYedekAl = () => {
@@ -94,6 +135,100 @@ export const YedeklemePaneli: React.FC<YedeklemePaneliProps> = ({
     reader.readAsText(file);
   };
 
+  // GitHub Ayarlarını Kaydet
+  const handleGhKaydet = () => {
+    const updated = saveGitHubConfig(ghConfig);
+    setGhConfig(updated);
+    setBildirim('GitHub ayarları başarıyla kaydedildi.');
+    setTimeout(() => setBildirim(null), 4000);
+  };
+
+  // GitHub Bağlantı Testi
+  const handleGhTest = async () => {
+    setGhTestYukleniyor(true);
+    setGhTestSonuc(null);
+    const res = await testGitHubConnection(ghConfig);
+    setGhTestYukleniyor(false);
+    setGhTestSonuc(res);
+  };
+
+  // GitHub'dan Şimdi Çek (Pull)
+  const handleGhCek = async () => {
+    setGhSenkYukleniyor(true);
+    const res = await fetchFromGitHub(ghConfig);
+    setGhSenkYukleniyor(false);
+    if (res.success && res.personeller && res.personeller.length > 0) {
+      onVeriYukle(res.personeller);
+      setGhConfig(getGitHubConfig());
+      setBildirim(`GitHub'dan ${res.personeller.length} personel kaydı başarıyla indirildi ve sisteme uygulandı!`);
+      setTimeout(() => setBildirim(null), 6000);
+    } else if (res.isEmpty) {
+      setBildirim('GitHub deposunda henüz kayıtlı veritabanı dosyası yok. Aşağıdaki "GitHub\'a Şimdi Gönder (Push)" butonuna basarak ilk yedeği yükleyebilirsiniz.');
+      setTimeout(() => setBildirim(null), 7000);
+    } else {
+      setBildirim(`GitHub Senkronizasyon Hatası: ${res.message}`);
+      setTimeout(() => setBildirim(null), 6000);
+    }
+  };
+
+  // GitHub'a Şimdi Gönder (Push)
+  const handleGhGonder = async () => {
+    setGhSenkYukleniyor(true);
+    const res = await pushToGitHub(
+      personeller,
+      `Manuel Veritabanı Güncelleme (${personeller.length} Personel) - ${new Date().toLocaleString('tr-TR')}`,
+      ghConfig
+    );
+    setGhSenkYukleniyor(false);
+    if (res.success) {
+      setGhConfig(getGitHubConfig());
+      setBildirim(`Mevcut ${personeller.length} personel verisi GitHub'a başarıyla kaydedildi!`);
+      setTimeout(() => setBildirim(null), 6000);
+    } else {
+      setBildirim(`GitHub'a Kaydetme Hatası: ${res.message}`);
+      setTimeout(() => setBildirim(null), 6000);
+    }
+  };
+
+  // 5 Bilgisayar İçin Tek Tıkla Kurulum Kodunu Kopyala
+  const handleGhKoduKopyala = () => {
+    const code = generateSetupCode(ghConfig);
+    navigator.clipboard.writeText(code);
+    setGhKurulumKodu(code);
+    setGhKoduKopyalandi(true);
+    setBildirim('Kurulum kodu panoya kopyalandı! Diğer 4 bilgisayarda "Kodu Uygula" kutusuna yapıştırmanız yeterlidir.');
+    setTimeout(() => {
+      setGhKoduKopyalandi(false);
+      setBildirim(null);
+    }, 6000);
+  };
+
+  // Diğer Bilgisayardan Gelen Kurulum Kodunu Uygula
+  const handleGhKoduUygula = async () => {
+    if (!girilenKurulumKodu.trim()) {
+      alert('Lütfen 1. bilgisayardan kopyaladığınız kurulum kodunu yapıştırın.');
+      return;
+    }
+    const res = applySetupCode(girilenKurulumKodu);
+    if (res.success && res.config) {
+      setGhConfig(res.config);
+      setGirilenKurulumKodu('');
+      setBildirim('Tebrikler! GitHub ayarları kurulum kodundan otomatik yüklendi. Şimdi veriler kontrol ediliyor...');
+      
+      // Hemen GitHub'dan en güncel veriyi çek
+      setGhSenkYukleniyor(true);
+      const fetchRes = await fetchFromGitHub(res.config);
+      setGhSenkYukleniyor(false);
+      if (fetchRes.success && fetchRes.personeller && fetchRes.personeller.length > 0) {
+        onVeriYukle(fetchRes.personeller);
+        setBildirim(`Tebrikler! Kurulum tamamlandı ve GitHub'dan ${fetchRes.personeller.length} personel kaydı hemen yüklendi.`);
+      }
+      setTimeout(() => setBildirim(null), 7000);
+    } else {
+      alert(res.message);
+    }
+  };
+
   return (
     <div className="p-4 space-y-4 text-xs font-sans">
       {/* Bildirim Çubuğu */}
@@ -140,6 +275,270 @@ export const YedeklemePaneli: React.FC<YedeklemePaneliProps> = ({
           <div className="border-l border-slate-700 pl-4">
             <span className="text-slate-500 block text-[10px]">Bütünlük Durumu:</span>
             <span className="font-semibold text-emerald-400">Doğrulandı &amp; Sağlam</span>
+          </div>
+        </div>
+      </div>
+
+      {/* GİTHUB İLE 5 BİLGİSAYAR ORTAK VERİTABANI SENKRONİZASYONU */}
+      <div className="bg-gradient-to-r from-slate-900 via-[#162235] to-slate-900 text-white p-4 rounded-xs border-2 border-blue-500/40 shadow-md">
+        {/* Üst Başlık & Hızlı İşlem Butonları */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 border-b border-slate-700/70 pb-3">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-slate-800 border border-slate-700 rounded text-white shadow-xs">
+              <Github className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm text-white">
+                  GitHub Otomatik Veritabanı Senkronizasyonu (5 Bilgisayar Ortak)
+                </h3>
+                {isGitHubConfigured(ghConfig) ? (
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Bağlı &amp; Aktif {ghConfig.lastSyncTime ? `(${ghConfig.lastSyncTime})` : ''}</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded font-mono font-semibold">
+                    ○ Yapılandırılmadı
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                5 bilgisayarın da aynı verileri anlık görmesi için GitHub üzerindeki özel (Private) repoyu merkezi veritabanı olarak kullanır.
+              </p>
+            </div>
+          </div>
+
+          {/* Hızlı Eşitleme Butonları */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleGhCek}
+              disabled={ghSenkYukleniyor || !isGitHubConfigured(ghConfig)}
+              title="GitHub'daki en güncel veritabanını indirip sisteme yükler"
+              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <CloudDownload className="w-3.5 h-3.5" />
+              <span>{ghSenkYukleniyor ? 'İndiriliyor...' : "GitHub'dan Getir (Pull)"}</span>
+            </button>
+
+            <button
+              onClick={handleGhGonder}
+              disabled={ghSenkYukleniyor || !isGitHubConfigured(ghConfig)}
+              title="Mevcut personel verilerini GitHub'a gönderir (Commit & Push)"
+              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <CloudUpload className="w-3.5 h-3.5" />
+              <span>{ghSenkYukleniyor ? 'Gönderiliyor...' : "GitHub'a Gönder (Push)"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Ana Gövde: 2 Kolonlu Panel */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3 pt-1">
+          {/* Sol Kolon: GitHub Hesap & Repo Ayarları */}
+          <div className="bg-slate-800/80 p-3.5 rounded border border-slate-700 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-blue-300 font-bold text-xs flex items-center gap-1.5">
+                <Key className="w-4 h-4 text-blue-400" />
+                <span>1. GitHub Bağlantı Ayarları</span>
+              </span>
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ghConfig.enabled}
+                  onChange={(e) => setGhConfig((prev) => ({ ...prev, enabled: e.target.checked }))}
+                  className="rounded border-slate-600 text-blue-600"
+                />
+                <span>GitHub Senkronizasyonunu Etkinleştir</span>
+              </label>
+            </div>
+
+            {/* Repo Bilgisi */}
+            <div>
+              <label className="block text-[11px] text-slate-300 font-medium mb-1">
+                GitHub Depo Adı (KullanıcıAdı / Repo):
+              </label>
+              <div className="flex items-center bg-slate-900 border border-slate-600 rounded px-2.5 py-1.5 focus-within:border-blue-400">
+                <GitBranch className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Örn: ilyasilmk/tcdd-personel-db"
+                  value={ghConfig.repo}
+                  onChange={(e) => setGhConfig((prev) => ({ ...prev, repo: e.target.value }))}
+                  className="bg-transparent border-none text-white text-xs font-mono outline-none w-full placeholder:text-slate-500"
+                />
+              </div>
+              <span className="text-[10px] text-slate-400 block mt-0.5">
+                * GitHub'da açtığınız özel (Private) deponun adıdır.
+              </span>
+            </div>
+
+            {/* Erişim Belirteci (Token) */}
+            <div>
+              <label className="block text-[11px] text-slate-300 font-medium mb-1">
+                Kişisel Erişim Belirteci (Personal Access Token):
+              </label>
+              <div className="flex items-center bg-slate-900 border border-slate-600 rounded px-2.5 py-1.5 focus-within:border-blue-400">
+                <Key className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+                <input
+                  type={ghTokenGoster ? 'text' : 'password'}
+                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  value={ghConfig.token}
+                  onChange={(e) => setGhConfig((prev) => ({ ...prev, token: e.target.value }))}
+                  className="bg-transparent border-none text-white text-xs font-mono outline-none w-full placeholder:text-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setGhTokenGoster((prev) => !prev)}
+                  className="text-slate-400 hover:text-white ml-1 cursor-pointer"
+                  title={ghTokenGoster ? 'Gizle' : 'Göster'}
+                >
+                  {ghTokenGoster ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <span className="text-[10px] text-slate-400 block mt-0.5">
+                * GitHub Settings &gt; Developer settings &gt; Personal access tokens bölümünden alınır.
+              </span>
+            </div>
+
+            {/* Otomatik Seçenekler */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-700/60">
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ghConfig.autoSyncOnStart}
+                  onChange={(e) => setGhConfig((prev) => ({ ...prev, autoSyncOnStart: e.target.checked }))}
+                  className="rounded border-slate-600 text-blue-600"
+                />
+                <span>Program açılışında otomatik tara &amp; getir</span>
+              </label>
+
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ghConfig.autoPushOnChange}
+                  onChange={(e) => setGhConfig((prev) => ({ ...prev, autoPushOnChange: e.target.checked }))}
+                  className="rounded border-slate-600 text-blue-600"
+                />
+                <span>Personel eklenince otomatik GitHub'a gönder</span>
+              </label>
+            </div>
+
+            {/* Test ve Kaydet Butonları */}
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={handleGhTest}
+                disabled={ghTestYukleniyor || !ghConfig.token || !ghConfig.repo}
+                className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white px-3 py-1.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${ghTestYukleniyor ? 'animate-spin text-blue-400' : ''}`} />
+                <span>{ghTestYukleniyor ? 'Test Ediliyor...' : 'Bağlantıyı Test Et'}</span>
+              </button>
+
+              <button
+                onClick={handleGhKaydet}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded text-xs font-bold transition-colors cursor-pointer shadow-xs"
+              >
+                Ayarları Kaydet
+              </button>
+            </div>
+
+            {/* Test Sonucu Bildirimi */}
+            {ghTestSonuc && (
+              <div
+                className={`p-2.5 rounded text-xs flex items-start space-x-2 border ${
+                  ghTestSonuc.success
+                    ? 'bg-emerald-950/70 border-emerald-600/50 text-emerald-200'
+                    : 'bg-rose-950/70 border-rose-600/50 text-rose-200'
+                }`}
+              >
+                {ghTestSonuc.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                )}
+                <span>{ghTestSonuc.message}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Sağ Kolon: 5 Bilgisayar İçin Tek Tıkla Kurulum Kodu (Sihirbaz) */}
+          <div className="bg-slate-800/80 p-3.5 rounded border border-slate-700 flex flex-col justify-between space-y-3">
+            <div>
+              <div className="flex items-center space-x-2 text-cyan-300 font-bold text-xs">
+                <Sparkles className="w-4 h-4 text-cyan-400" />
+                <span>2. 5 Bilgisayar İçin Tek Tıkla Kurulum Sihirbazı</span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                Diğer 4 bilgisayarda token ve repo adını <b>tek tek elle yazmakla uğraşmayın!</b>
+              </p>
+
+              {/* Adım A: 1. Bilgisayardan Kodu Al */}
+              <div className="mt-3 bg-slate-900/80 p-2.5 rounded border border-slate-700/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-[11px] text-blue-200">
+                    A) 1. Bilgisayarda Ayarladıktan Sonra:
+                  </span>
+                  <button
+                    onClick={handleGhKoduKopyala}
+                    disabled={!ghConfig.token || !ghConfig.repo}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    {ghKoduKopyalandi ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{ghKoduKopyalandi ? 'Kopyalandı!' : 'Kurulum Kodunu Kopyala'}</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  * Bu butona basarak kurulum kodunu alın (WhatsApp, Mail veya Flash bellek ile diğer bilgisayarlara iletebilirsiniz).
+                </p>
+              </div>
+
+              {/* Adım B: Diğer 4 Bilgisayarda Kodu Uygula */}
+              <div className="mt-3 bg-slate-900/80 p-2.5 rounded border border-slate-700/80 space-y-2">
+                <span className="font-semibold text-[11px] text-cyan-200 block">
+                  B) Diğer 4 Bilgisayarda Bu Kodu Yapıştırın:
+                </span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="TCDD-GH-eyJ2IjoxLCJ..."
+                    value={girilenKurulumKodu}
+                    onChange={(e) => setGirilenKurulumKodu(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-600 focus:border-cyan-400 px-2.5 py-1.5 rounded text-xs text-white font-mono placeholder:text-slate-600 outline-none"
+                  />
+                  <button
+                    onClick={handleGhKoduUygula}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors cursor-pointer shrink-0 shadow-xs"
+                  >
+                    Kodu Uygula &amp; Bağlan
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  * Kodu yapıştırıp butona bastığınız anda GitHub ayarları yüklenir ve en güncel veritabanı anında indirilir.
+                </p>
+              </div>
+            </div>
+
+            {/* Kolay Rehber Butonu */}
+            <div className="pt-2 border-t border-slate-700">
+              <button
+                type="button"
+                onClick={() => setRehberAcik((prev) => !prev)}
+                className="text-[11px] text-cyan-300 hover:text-cyan-200 flex items-center gap-1 cursor-pointer font-medium"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>{rehberAcik ? 'Rehberi Gizle ▲' : '1 Dakikada GitHub Deposu & Token Alma Rehberi ▼'}</span>
+              </button>
+
+              {rehberAcik && (
+                <div className="mt-2 p-2.5 bg-slate-900 rounded border border-cyan-800/50 text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
+                  <p className="text-cyan-200 font-bold">Nasıl Yapılır? (Toplam 3 Basit Adım):</p>
+                  <p><b>1. Özel Repo Açın:</b> github.com'a giriş yapıp sağ üstteki <b>"+" &gt; "New repository"</b> deyin. Depo adını yazın (örn: <code>tcdd-personel-db</code>), <b>"Private" (Gizli)</b> seçeneğini işaretleyip oluşturun.</p>
+                  <p><b>2. Token Alın:</b> Sağ üstteki profil resminiz &gt; <b>Settings</b> &gt; En alttaki <b>Developer settings</b> &gt; <b>Personal access tokens (classic)</b> &gt; <b>Generate new token (classic)</b> seçin. İsim yazıp yalnızca <b>repo</b> kutucuğunu işaretleyin ve oluşturun.</p>
+                  <p><b>3. Buraya Girin:</b> Aldığınız <code>ghp_...</code> token'ını ve repo adını soldaki kutulara girip <b>"Bağlantıyı Test Et &amp; Kaydet"</b> butonuna basın. Ardından <b>"Kurulum Kodunu Kopyala"</b> diyerek diğer 4 bilgisayara dağıtın!</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

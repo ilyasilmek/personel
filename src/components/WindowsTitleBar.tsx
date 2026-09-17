@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Bell, BellOff, Maximize, Minimize } from 'lucide-react';
+import { Database, Bell, BellOff, Maximize, Minimize, Github, RefreshCw } from 'lucide-react';
 
 interface WindowsTitleBarProps {
   isMaximized?: boolean;
@@ -7,12 +7,18 @@ interface WindowsTitleBarProps {
   isOnline?: boolean;
   bildirimlerAktif?: boolean;
   onToggleBildirimler?: () => void;
+  isGitHubActive?: boolean;
+  gitHubSyncStatus?: 'idle' | 'syncing' | 'success' | 'error';
+  onTriggerGitHubSync?: () => void;
 }
 
 export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
   isOnline = true,
   bildirimlerAktif = true,
   onToggleBildirimler,
+  isGitHubActive = false,
+  gitHubSyncStatus = 'idle',
+  onTriggerGitHubSync,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
     return typeof document !== 'undefined' && !!document.fullscreenElement;
@@ -81,6 +87,28 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                 <span className="hidden md:inline">Mesajlar: Kapalı</span>
               </>
             )}
+          </button>
+        )}
+
+        {/* GitHub Senkronizasyon Rozeti / Butonu */}
+        {isGitHubActive && (
+          <button
+            onClick={onTriggerGitHubSync}
+            disabled={gitHubSyncStatus === 'syncing'}
+            title="GitHub ile Şimdi Eşitle (Veritabanını Karşılaştır & Güncelle)"
+            className={`flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] border transition-colors cursor-pointer ${
+              gitHubSyncStatus === 'syncing'
+                ? 'bg-blue-900/80 text-blue-200 border-blue-600 animate-pulse'
+                : gitHubSyncStatus === 'error'
+                ? 'bg-rose-950/70 hover:bg-rose-900 text-rose-300 border-rose-800'
+                : 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700'
+            }`}
+          >
+            <Github className="w-3 h-3 text-white" />
+            <RefreshCw className={`w-2.5 h-2.5 ${gitHubSyncStatus === 'syncing' ? 'animate-spin text-blue-400' : 'text-slate-400'}`} />
+            <span className="hidden sm:inline font-mono">
+              {gitHubSyncStatus === 'syncing' ? 'Eşitleniyor...' : 'GitHub Senk: Aktif'}
+            </span>
           </button>
         )}
 
