@@ -128,7 +128,7 @@ export const PersonelModal: React.FC<PersonelModalProps> = ({
         sicilNo: duzenlenecekPersonel?.sicilNo || `S-${Date.now().toString().slice(-6)}`,
         personelNo: duzenlenecekPersonel?.personelNo || '',
         ad: ad.trim(),
-        soyad: soyad.trim(),
+        soyad: soyad.trim().toLocaleUpperCase('tr-TR'),
         email: email.trim() || `${ad.toLowerCase()}.${soyad.toLowerCase()}@kurum.com.tr`,
         telefon: telefon.trim() || '0555 000 00 00',
         cepTelefonu: telefon.trim() || '0555 000 00 00',
@@ -298,9 +298,9 @@ export const PersonelModal: React.FC<PersonelModalProps> = ({
                 <input
                   type="text"
                   value={soyad}
-                  onChange={(e) => setSoyad(e.target.value)}
+                  onChange={(e) => setSoyad(e.target.value.toLocaleUpperCase('tr-TR'))}
                   placeholder="Personel soyadı"
-                  className={`w-full px-2.5 py-1.5 border rounded focus:outline-none focus:ring-1 ${
+                  className={`w-full px-2.5 py-1.5 border rounded uppercase focus:outline-none focus:ring-1 ${
                     hatalar.soyad ? 'border-red-500 focus:ring-red-400' : 'border-slate-300 focus:ring-blue-500'
                   }`}
                 />

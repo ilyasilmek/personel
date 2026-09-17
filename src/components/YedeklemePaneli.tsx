@@ -150,6 +150,9 @@ export const YedeklemePaneli: React.FC<YedeklemePaneliProps> = ({
     const res = await testGitHubConnection(ghConfig);
     setGhTestYukleniyor(false);
     setGhTestSonuc(res);
+    if (res.success && res.repoDetails?.defaultBranch) {
+      setGhConfig((prev) => ({ ...prev, branch: res.repoDetails!.defaultBranch }));
+    }
   };
 
   // GitHub'dan Şimdi Çek (Pull)
@@ -163,11 +166,11 @@ export const YedeklemePaneli: React.FC<YedeklemePaneliProps> = ({
       setBildirim(`GitHub'dan ${res.personeller.length} personel kaydı başarıyla indirildi ve sisteme uygulandı!`);
       setTimeout(() => setBildirim(null), 6000);
     } else if (res.isEmpty) {
-      setBildirim('GitHub deposunda henüz kayıtlı veritabanı dosyası yok. Aşağıdaki "GitHub\'a Şimdi Gönder (Push)" butonuna basarak ilk yedeği yükleyebilirsiniz.');
+      setBildirim('GitHub deposunda henüz kayıtlı veritabanı dosyası yok veya dosya boş. "GitHub\'a Şimdi Gönder (Push)" butonuna basarak mevcut listenizi depoya yükleyebilirsiniz.');
       setTimeout(() => setBildirim(null), 7000);
     } else {
-      setBildirim(`GitHub Senkronizasyon Hatası: ${res.message}`);
-      setTimeout(() => setBildirim(null), 6000);
+      setBildirim(res.message || 'GitHub senkronizasyonu tamamlanamadı.');
+      setTimeout(() => setBildirim(null), 7000);
     }
   };
 

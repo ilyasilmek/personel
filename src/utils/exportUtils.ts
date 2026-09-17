@@ -5,6 +5,18 @@ import { Personel, VeritabaniYedek } from '../types';
 import { registerTurkishFont } from './turkishPdfFont';
 
 /**
+ * Personel listesini her zaman isme (ve ardından soyisme) göre A'dan Z'ye sıralar
+ * Türkçe karakter uyumludur (Ç, Ğ, İ, Ö, Ş, Ü)
+ */
+export function sortPersonellerByName(list: Personel[]): Personel[] {
+  return [...list].sort((a, b) => {
+    const cmpAd = (a.ad || '').trim().localeCompare((b.ad || '').trim(), 'tr', { sensitivity: 'base' });
+    if (cmpAd !== 0) return cmpAd;
+    return (a.soyad || '').trim().localeCompare((b.soyad || '').trim(), 'tr', { sensitivity: 'base' });
+  });
+}
+
+/**
  * jsPDF helvetica fontu için güvenli Türkçe harf dönüştürücü (gerekirse geriye dönük uyumluluk)
  */
 export function turkishSafePdfText(text: string | number | undefined | null): string {
@@ -16,6 +28,7 @@ export function turkishSafePdfText(text: string | number | undefined | null): st
  * Excel (.xlsx) formatında çıktı - Kullanıcının istediği:
  * İşçi bölümündeyse -> ISCI_LISTE.xlsx (Sayfa: İŞÇİ LİSTE)
  * Memur bölümündeyse -> MEMUR_LISTE.xlsx (Sayfa: MEMUR LİSTE)
+ * Döküm her zaman isme göre sıralanır
  */
 export function exportPersonnelToExcel(
   personeller: Personel[],
@@ -28,12 +41,15 @@ export function exportPersonnelToExcel(
   const dosyaAdi = isMemur ? 'MEMUR LİSTE' : 'İŞÇİ LİSTE';
   const sayfaAdi = isMemur ? 'MEMUR LİSTE' : 'İŞÇİ LİSTE';
 
-  const data = personeller.map((p, index) => ({
+  // Döküm her zaman isme göre sıralı
+  const siraliPersoneller = sortPersonellerByName(personeller);
+
+  const data = siraliPersoneller.map((p, index) => ({
     'SIRA NO': index + 1,
     'SİCİLİ': p.sicilNo || '-',
     'PERSONEL NO': p.personelNo || '-',
     'ADI': p.ad || '-',
-    'SOYADI': p.soyad || '-',
+    'SOYADI': p.soyad ? p.soyad.toLocaleUpperCase('tr-TR') : '-',
     'ÜNVANI': p.unvan || p.sanatKodu || '-',
     'TELEFONU': p.cepTelefonu || '-',
     'TC KİMLİK NO': p.tcKimlik || '-',
@@ -99,17 +115,20 @@ export function exportPersonnelToPdf(
   doc.setFont('LiberationSans', 'bold');
   doc.text(baslikText, 148.5, 16.5, { align: 'center' });
 
+  // Döküm her zaman isme göre sıralı
+  const siraliPersoneller = sortPersonellerByName(personeller);
+
   // Tek sayfaya net ve okunaklı sığdırma ölçeklendirmesi (25+ satır için optimize)
-  const count = personeller.length;
+  const count = siraliPersoneller.length;
   const dynamicFontSize = count > 28 ? 6.5 : count > 20 ? 7.1 : 7.6;
   const dynamicPadding = count > 28 ? 0.8 : count > 20 ? 1.05 : 1.5;
 
-  const tableData = personeller.map((p, index) => [
+  const tableData = siraliPersoneller.map((p, index) => [
     (index + 1).toString(),
     p.sicilNo || '-',
     p.personelNo || '-',
     p.ad || '-',
-    p.soyad || '-',
+    p.soyad ? p.soyad.toLocaleUpperCase('tr-TR') : '-',
     p.unvan || p.sanatKodu || '-',
     p.cepTelefonu || '-',
     p.tcKimlik || '-',
@@ -208,7 +227,7 @@ export function exportSinglePersonnelPdf(p: Personel): void {
       ['SİCİLİ', p.sicilNo || '-'],
       ['PERSONEL NO', p.personelNo || '-'],
       ['ADI', p.ad || '-'],
-      ['SOYADI', p.soyad || '-'],
+      ['SOYADI', p.soyad ? p.soyad.toLocaleUpperCase('tr-TR') : '-'],
       ['ÜNVANI', p.unvan || p.sanatKodu || '-'],
       ['TELEFONU', p.cepTelefonu || '-'],
       ['TC KİMLİK NO', p.tcKimlik || '-'],

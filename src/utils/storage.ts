@@ -32,11 +32,18 @@ function getApiBaseUrl(): string {
   return custom ? custom : '';
 }
 
+export function normalizePersonel(p: Personel): Personel {
+  return {
+    ...p,
+    soyad: p.soyad ? p.soyad.trim().toLocaleUpperCase('tr-TR') : '',
+  };
+}
+
 export function loadPersoneller(): Personel[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_PERSONEL);
     if (!raw) {
-      const initialized = BASLANGIC_PERSONELLER;
+      const initialized = BASLANGIC_PERSONELLER.map(normalizePersonel);
       localStorage.setItem(STORAGE_KEY_PERSONEL, JSON.stringify(initialized));
       return initialized;
     }
@@ -44,19 +51,22 @@ export function loadPersoneller(): Personel[] {
     // Eğer memur verileri henüz gelmediyse başlangıç listesini yükle
     const hasNewMemur = parsed.some((p) => p.sicilNo === 'S051838' || p.id === 'memur-1');
     if (!hasNewMemur) {
-      localStorage.setItem(STORAGE_KEY_PERSONEL, JSON.stringify(BASLANGIC_PERSONELLER));
-      return BASLANGIC_PERSONELLER;
+      const initialized = BASLANGIC_PERSONELLER.map(normalizePersonel);
+      localStorage.setItem(STORAGE_KEY_PERSONEL, JSON.stringify(initialized));
+      return initialized;
     }
-    return parsed;
+    const normalized = parsed.map(normalizePersonel);
+    return normalized;
   } catch (err) {
     console.error('Veri yüklenirken hata:', err);
-    return BASLANGIC_PERSONELLER;
+    return BASLANGIC_PERSONELLER.map(normalizePersonel);
   }
 }
 
 export function savePersoneller(list: Personel[]): void {
   try {
-    localStorage.setItem(STORAGE_KEY_PERSONEL, JSON.stringify(list));
+    const normalized = list.map(normalizePersonel);
+    localStorage.setItem(STORAGE_KEY_PERSONEL, JSON.stringify(normalized));
   } catch (err) {
     console.error('Veri kaydedilirken hata:', err);
   }
@@ -77,8 +87,9 @@ export async function fetchPersonellerOnline(): Promise<Personel[]> {
       : (data && Array.isArray(data.personeller) ? data.personeller : null);
 
     if (list && list.length > 0) {
-      savePersoneller(list);
-      return list;
+      const normalized = list.map(normalizePersonel);
+      savePersoneller(normalized);
+      return normalized;
     }
   } catch (err) {
     console.warn('Online senkronizasyon uyarısı, yerel önbellek kullanılıyor:', err);
@@ -87,13 +98,14 @@ export async function fetchPersonellerOnline(): Promise<Personel[]> {
 }
 
 export async function savePersonellerOnline(list: Personel[]): Promise<void> {
-  savePersoneller(list);
+  const normalized = list.map(normalizePersonel);
+  savePersoneller(normalized);
   try {
     const baseUrl = getApiBaseUrl();
     await fetch(`${baseUrl}/api/personeller`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(list),
+      body: JSON.stringify(normalized),
     });
   } catch (err) {
     console.warn('Online sunucuya iletilemedi, yerel önbellekte saklandı:', err);

@@ -31,7 +31,14 @@ function readDatabase(): DbStructure {
   try {
     if (fs.existsSync(DB_FILE)) {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.personeller)) {
+        parsed.personeller = parsed.personeller.map((p: any) => ({
+          ...p,
+          soyad: p.soyad ? String(p.soyad).trim().toLocaleUpperCase('tr-TR') : '',
+        }));
+      }
+      return parsed;
     }
   } catch (err) {
     console.error('Veritabanı okuma hatası:', err);
@@ -47,6 +54,12 @@ function readDatabase(): DbStructure {
 function writeDatabase(data: DbStructure): void {
   try {
     data.lastUpdated = new Date().toISOString();
+    if (Array.isArray(data.personeller)) {
+      data.personeller = data.personeller.map((p: any) => ({
+        ...p,
+        soyad: p.soyad ? String(p.soyad).trim().toLocaleUpperCase('tr-TR') : '',
+      }));
+    }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
     console.error('Veritabanı yazma hatası:', err);

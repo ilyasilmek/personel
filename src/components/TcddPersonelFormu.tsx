@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Personel,
   PersonelTuru,
@@ -34,6 +34,7 @@ import {
   X,
   Lock,
   Unlock,
+  Maximize2,
 } from 'lucide-react';
 import {
   EGITIM_SEVIYELERI,
@@ -41,9 +42,14 @@ import {
   getBolumListesi,
   getEgitimSeviyesi,
 } from '../data/educationData';
-import { PWAInstallButton } from './PWAInstallButton';
 import { exportSinglePersonnelPdf, exportPersonnelToExcel, exportPersonnelToPdf } from '../utils/exportUtils';
 import { searchMatches } from '../utils/textUtils';
+import {
+  TIS_31_BIRLESTIRILMIS_IS_ISIMLERI,
+  formatPhoneNumber,
+  formatDateInput,
+  generateTcddEmail,
+} from '../data/sanatKodlariData';
 
 interface TcddPersonelFormuProps {
   personeller: Personel[];
@@ -189,6 +195,7 @@ export function TcddPersonelFormu({
   // Modallar
   const [evrakModalOpen, setEvrakModalOpen] = useState(false);
   const [fotoModalOpen, setFotoModalOpen] = useState(false);
+  const [fotoBuyutModalOpen, setFotoBuyutModalOpen] = useState(false);
   const [yeniEvrakAdi, setYeniEvrakAdi] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docFileInputRef = useRef<HTMLInputElement>(null);
@@ -248,9 +255,13 @@ export function TcddPersonelFormu({
     });
   };
 
-  // Okul Seviyesi ve Bölüm Mantığı
+  // Okul Seviyesi ve Bölüm Mantığı (Harf Sırasına Göre Düzenlendi - Madde 4)
   const seciliOkulSeviyesi = getEgitimSeviyesi(formData.bitirdigiOkul);
-  const bolumSecenekleri = getBolumListesi(seciliOkulSeviyesi);
+  const bolumSecenekleri = useMemo(() => {
+    return getBolumListesi(seciliOkulSeviyesi)
+      .slice()
+      .sort((a, b) => a.localeCompare(b, 'tr'));
+  }, [seciliOkulSeviyesi]);
   const isIlkOrOrta = seciliOkulSeviyesi === 'İlkokul' || seciliOkulSeviyesi === 'Ortaokul';
 
   const handleOkulSeviyeDegistir = (yeniSeviye: string) => {
@@ -260,7 +271,7 @@ export function TcddPersonelFormu({
       if (seviye === 'İlkokul' || seviye === 'Ortaokul') {
         yeniBolum = '';
       } else {
-        const liste = getBolumListesi(seviye);
+        const liste = getBolumListesi(seviye).slice().sort((a, b) => a.localeCompare(b, 'tr'));
         if (liste.length > 0 && (!prev.bolumu || !liste.includes(prev.bolumu))) {
           yeniBolum = liste[0];
         }
@@ -327,11 +338,33 @@ export function TcddPersonelFormu({
       return;
     }
 
-    onPersonelKaydet(formData, isNewRecord);
+    // E-posta kontrol ve otomatik oluşturma (Madde 6)
+    let finalEmail = formData.email?.trim() || '';
+    if (!finalEmail || finalEmail === '@tcddtasimacilik.gov.tr') {
+      finalEmail = generateTcddEmail(formData.ad, formData.soyad);
+    } else if (!finalEmail.includes('@')) {
+      finalEmail = `${finalEmail}@tcddtasimacilik.gov.tr`;
+    }
+
+    // Personel No (1100 ön eki kaldırıldı - Madde 2)
+    const finalPersonelNo = formData.personelNo?.trim() || '';
+
+    const dataToSave: Personel = {
+      ...formData,
+      soyad: formData.soyad ? formData.soyad.trim().toLocaleUpperCase('tr-TR') : '',
+      email: finalEmail,
+      personelNo: finalPersonelNo,
+      cepTelefonu: formatPhoneNumber(formData.cepTelefonu),
+      dogumTarihi: formatDateInput(formData.dogumTarihi),
+      iseGirisTarihi: formatDateInput(formData.iseGirisTarihi),
+    };
+
+    setFormData(dataToSave);
+    onPersonelKaydet(dataToSave, isNewRecord);
     setIsNewRecord(false);
     setDuzenlemeModu(false); // Kayıttan sonra form otomatik olarak pasif moda döner
-    setSeciliId(formData.id);
-    showToast(`${formData.ad} ${formData.soyad} (${formData.sicilNo}) başarıyla kaydedildi.`);
+    setSeciliId(dataToSave.id);
+    showToast(`${dataToSave.ad} ${dataToSave.soyad} (${dataToSave.sicilNo || dataToSave.personelNo}) başarıyla kaydedildi.`);
   };
 
   // Sil
@@ -403,150 +436,56 @@ export function TcddPersonelFormu({
   };
 
   return (
-    <div className="flex flex-col h-full select-none bg-[#ece9d8] text-black font-sans text-xs">
-      {/* 1. CLASSIC WINDOWS MENU BAR */}
-      <div className="bg-[#f0f0f0] border-b border-[#d4d0c8] px-2 py-0.5 flex items-center gap-1 text-[11px] text-gray-800">
-        <div className="relative group">
-          <button className="px-2 py-0.5 hover:bg-[#316ac5] hover:text-white rounded-none cursor-pointer">
-            Dosya
-          </button>
-          <div className="hidden group-hover:flex flex-col absolute top-full left-0 bg-white border border-gray-400 shadow-lg z-50 min-w-[200px] py-1 text-black">
-            <button onClick={handleYeniEkle} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center justify-between">
-              <span>Yeni Personel Kaydı</span> <span className="text-[10px] text-gray-400">Ctrl+N</span>
-            </button>
-            <button onClick={handleKaydetVeGuncelle} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center justify-between">
-              <span>Kaydet / Güncelle</span> <span className="text-[10px] text-gray-400">Ctrl+S</span>
-            </button>
-            <hr className="my-1 border-gray-200" />
-            <button onClick={() => exportSinglePersonnelPdf(formData)} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center gap-2">
-              <Printer className="w-3.5 h-3.5 text-blue-600" />
-              <span>Personel Özlük Kartı Yazdır (PDF)</span>
-            </button>
-            <button onClick={() => exportPersonnelToPdf(personeller)} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center gap-2">
-              <FileText className="w-3.5 h-3.5 text-red-600" />
-              <span>Tüm Personel Listesi (PDF)</span>
-            </button>
-            <button onClick={() => exportPersonnelToExcel(personeller)} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center gap-2">
-              <FileSpreadsheet className="w-3.5 h-3.5 text-green-600" />
-              <span>Excel'e Aktar (.xlsx)</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="relative group">
-          <button className="px-2 py-0.5 hover:bg-[#316ac5] hover:text-white rounded-none cursor-pointer">
-            Düzen
-          </button>
-          <div className="hidden group-hover:flex flex-col absolute top-full left-0 bg-white border border-gray-400 shadow-lg z-50 min-w-[190px] py-1 text-black">
-            {!duzenlemeModu ? (
-              <button onClick={handleDuzenle} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center justify-between">
-                <span>Kaydı Düzenle</span> <span className="text-[10px] text-gray-400">Ctrl+E</span>
-              </button>
-            ) : (
-              <button onClick={handleDuzenleIptal} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center justify-between">
-                <span>Düzenlemeden Vazgeç</span> <span className="text-[10px] text-gray-400">Esc</span>
-              </button>
-            )}
-            <hr className="my-1 border-gray-200" />
-            <button onClick={handleSil} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white text-red-700 flex items-center justify-between">
-              <span>Personel Kaydını Sil</span> <span className="text-[10px] text-gray-400">Del</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="relative group">
-          <button className="px-2 py-0.5 hover:bg-[#316ac5] hover:text-white rounded-none cursor-pointer">
-            Araçlar
-          </button>
-          <div className="hidden group-hover:flex flex-col absolute top-full left-0 bg-white border border-gray-400 shadow-lg z-50 min-w-[180px] py-1 text-black">
-            <button onClick={onOpenYedekleme} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center gap-2">
-              <Database className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Yedekle - Yükle (.tcddbak)</span>
-            </button>
-            {onResmiYazdir && (
-              <button onClick={() => onResmiYazdir(formData)} className="px-3 py-1 text-left hover:bg-[#316ac5] hover:text-white flex items-center gap-2">
-                <Printer className="w-3.5 h-3.5 text-blue-600" />
-                <span>Resmi Rapor Yazdır / PDF</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="relative group">
-          <button onClick={() => alert('GEBZE VAGON BAKIM ATÖLYE MÜDÜRLÜĞÜ\nPersonel Takip Programı\nMerkezi Online Veritabanı ve Senkronizasyon')} className="px-2 py-0.5 hover:bg-[#316ac5] hover:text-white rounded-none cursor-pointer">
-            Yardım
-          </button>
-        </div>
-
-        {/* Hızlı Ekran Geçiş Butonları */}
-        {onAramaEkraninaDon && (
-          <button
-            onClick={onAramaEkraninaDon}
-            className="ml-2 px-2.5 py-0.5 bg-[#0055ea] hover:bg-blue-700 text-white font-bold rounded-xs cursor-pointer flex items-center gap-1 shadow-xs text-[11px]"
-            title="Arama Ekranına Geri Dön"
+    <div className="flex flex-col h-full select-none bg-[#ece9d8] text-black font-sans text-xs overflow-hidden">
+      {/* 2. PERSONEL BİLGİ & DURUM BARI (Hızlı Personel Arama / Seçme ve Gezinme) */}
+      <div className="px-3 py-2 flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-200 bg-white shadow-2xs">
+        {/* Sol: Seçili Personel Özeti & Kadro Rozeti */}
+        <div className="flex items-center gap-2.5 min-w-[220px]">
+          <div
+            onClick={() => {
+              if (formData.fotografUrl) setFotoBuyutModalOpen(true);
+            }}
+            className={`w-9 h-9 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs ${
+              formData.fotografUrl ? 'cursor-pointer hover:ring-2 hover:ring-blue-500' : ''
+            }`}
+            title={formData.fotografUrl ? 'Fotoğrafı büyütmek için tıklayınız' : undefined}
           >
-            <ArrowLeft className="w-3 h-3 text-white" />
-            <span>Arama Ekranı</span>
-          </button>
-        )}
-
-        {onGenelListeAc && (
-          <button
-            onClick={onGenelListeAc}
-            className="px-2.5 py-0.5 bg-[#334155] hover:bg-[#1e293b] text-white font-bold rounded-xs cursor-pointer flex items-center gap-1 shadow-xs text-[11px]"
-            title="Genel Personel Listesini Aç"
-          >
-            <Table className="w-3 h-3 text-white" />
-            <span>Genel Liste</span>
-          </button>
-        )}
-
-        {/* PWA Masaüstüne Kur / Çevrimdışı Desteği */}
-        <div className="ml-1">
-          <PWAInstallButton />
-        </div>
-
-        <div className="ml-auto flex items-center gap-2 text-[11px] text-gray-600 pr-2">
-          <span>Veritabanı: <b className="text-blue-900">Merkezi Sunucu (Online)</b></span>
-          <span>•</span>
-          <span className="text-emerald-700 font-semibold">● Çevrimiçi</span>
-        </div>
-      </div>
-
-      {/* 2. MODERN PERSONEL BİLGİ & GEZİNTİ BARI (TEKRARLANAN BAŞLIK KALDIRILDI) */}
-      <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white shadow-2xs">
-        {/* Seçili Personel Özeti & Kadro Rozeti */}
-        <div className="flex items-center gap-3 min-w-[260px]">
-          <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
             {formData.fotografUrl ? (
               <img src={formData.fotografUrl} alt={formData.ad} className="w-full h-full object-cover" />
             ) : (
-              <span className="text-sm font-bold text-slate-600 font-mono">
+              <span className="text-xs font-bold text-slate-600 font-mono">
                 {(formData.ad?.[0] || 'P') + (formData.soyad?.[0] || '')}
               </span>
             )}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-base font-bold text-slate-900 tracking-tight">
-                {formData.ad || formData.soyad ? `${formData.ad} ${formData.soyad}` : 'Yeni Personel Kaydı'}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-sm font-bold text-slate-900 tracking-tight">
+                {formData.ad || formData.soyad ? (
+                  <>
+                    <span>{formData.ad}</span>{' '}
+                    <span className="uppercase">{formData.soyad?.toLocaleUpperCase('tr-TR')}</span>
+                  </>
+                ) : (
+                  'Yeni Personel Kaydı'
+                )}
               </span>
               <span
-                className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold border ${
                   aktifGrup === 'MEMUR'
                     ? 'bg-amber-50 text-amber-800 border-amber-300'
                     : 'bg-blue-50 text-blue-800 border-blue-300'
                 }`}
               >
-                {aktifGrup === 'MEMUR' ? 'Memur Kadrosu' : 'İşçi Kadrosu'}
+                {aktifGrup === 'MEMUR' ? 'Memur' : 'İşçi'}
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300">
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300">
                 {formData.durum || 'Aktif'}
               </span>
 
               {/* FORM KORUMA (PASİF / AKTİF) DURUM ROZETİ */}
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
+                className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold border flex items-center gap-1 ${
                   duzenlemeModu
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                     : 'bg-amber-50 text-amber-800 border-amber-300'
@@ -555,87 +494,117 @@ export function TcddPersonelFormu({
               >
                 {duzenlemeModu ? (
                   <>
-                    <Unlock className="w-3 h-3 text-emerald-600" />
+                    <Unlock className="w-2.5 h-2.5 text-emerald-600" />
                     <span>Düzenleme Açık</span>
                   </>
                 ) : (
                   <>
-                    <Lock className="w-3 h-3 text-amber-600" />
+                    <Lock className="w-2.5 h-2.5 text-amber-600" />
                     <span>Form Pasif</span>
                   </>
                 )}
               </span>
             </div>
-            <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+            <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
               <span>Sicil: <b className="text-slate-800 font-mono">{formData.sicilNo || '-'}</b></span>
               <span>•</span>
-              <span>Ünvan: <span className="text-slate-700 font-medium">{formData.unvan || formData.sanatKodu || '-'}</span></span>
+              <span>Sanat: <span className="text-slate-700 font-medium truncate max-w-[140px]">{formData.sanatKodu || '-'}</span></span>
             </div>
           </div>
         </div>
 
-        {/* Kayıt Gezinti Butonları (İlk, Önceki, [Kayıt 1 / 106], Sonraki, Son) */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded border border-slate-300 shadow-2xs">
-          <button
-            onClick={handleIlk}
-            disabled={currentIdx <= 0 || totalCount === 0}
-            className="px-2 py-1 text-xs font-semibold rounded bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 border border-slate-300 cursor-pointer shadow-2xs"
-            title="İlk Kayıt"
-          >
-            ⏮ İlk
-          </button>
-          <button
-            onClick={handleOnceki}
-            disabled={currentIdx <= 0 || totalCount === 0}
-            className="px-2.5 py-1 text-xs font-semibold rounded bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 border border-slate-300 cursor-pointer shadow-2xs"
-            title="Önceki Kayıt"
-          >
-            ◀ Önceki
-          </button>
-          <div className="px-3 py-1 text-xs font-bold text-slate-800 bg-white rounded border border-slate-300 min-w-[90px] text-center font-mono">
-            {totalCount > 0 && currentIdx >= 0 ? `${currentIdx + 1} / ${totalCount}` : totalCount > 0 ? `1 / ${totalCount}` : '0 / 0'}
+        {/* ORTA: PERSONEL ARAMA VE AÇILIR LİSTE SEÇİM KUTUSU (Madde 1) */}
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-md border border-slate-300 shadow-inner">
+          <div className="flex items-center gap-1 bg-white border border-slate-300 rounded px-1.5 py-0.5 shadow-2xs">
+            <Search className="w-3 h-3 text-blue-600 shrink-0" />
+            <input
+              type="text"
+              value={aramaMetni}
+              onChange={(e) => setAramaMetni(e.target.value)}
+              placeholder="İsim veya Sicil Ara..."
+              className="text-[11px] bg-transparent focus:outline-none w-24 sm:w-32 text-slate-900 placeholder:text-slate-400"
+            />
+            {aramaMetni && (
+              <button
+                onClick={() => setAramaMetni('')}
+                className="text-slate-400 hover:text-slate-600 text-[10px] px-0.5 font-bold cursor-pointer"
+                title="Aramayı temizle"
+              >
+                ✕
+              </button>
+            )}
           </div>
-          <button
-            onClick={handleSonraki}
-            disabled={currentIdx >= totalCount - 1 || totalCount === 0}
-            className="px-2.5 py-1 text-xs font-semibold rounded bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 border border-slate-300 cursor-pointer shadow-2xs"
-            title="Sonraki Kayıt"
+
+          {/* Açılır Personel Seçim Listesi (Dropdown) */}
+          <select
+            id="select-personel-secim"
+            value={seciliId || ''}
+            onChange={(e) => {
+              const p = personeller.find(item => item.id === e.target.value);
+              if (p) handlePersonelSecimi(p);
+            }}
+            className="bg-white border border-slate-300 text-[11px] font-semibold rounded px-2 py-0.5 text-slate-800 focus:outline-none focus:border-blue-600 max-w-[180px] sm:max-w-[210px] truncate shadow-2xs cursor-pointer"
           >
-            Sonraki ▶
-          </button>
-          <button
-            onClick={handleSon}
-            disabled={currentIdx >= totalCount - 1 || totalCount === 0}
-            className="px-2 py-1 text-xs font-semibold rounded bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 border border-slate-300 cursor-pointer shadow-2xs"
-            title="Son Kayıt"
-          >
-            Son ⏭
-          </button>
+            <option value="">
+              {filtrelenmisPersoneller.length === 0 ? 'Kayıt bulunamadı' : `-- Personel Seç (${filtrelenmisPersoneller.length}) --`}
+            </option>
+            {filtrelenmisPersoneller
+              .slice()
+              .sort((a, b) => (a.ad + ' ' + a.soyad).localeCompare(b.ad + ' ' + b.soyad, 'tr'))
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.sicilNo ? `${p.sicilNo} - ` : ''}{p.ad} {p.soyad?.toLocaleUpperCase('tr-TR')}
+                </option>
+              ))}
+          </select>
+
+          {/* Hızlı Önceki / Sonraki Butonları */}
+          <div className="flex items-center border border-slate-300 rounded overflow-hidden shadow-2xs">
+            <button
+              onClick={handleOnceki}
+              disabled={filtrelenmisPersoneller.length <= 1}
+              title="Önceki Personel"
+              className="px-1.5 py-0.5 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 text-[10px] font-bold border-r border-slate-300 cursor-pointer"
+            >
+              ◀
+            </button>
+            <span className="px-1.5 py-0.5 bg-slate-50 text-[10px] font-mono font-bold text-slate-600 select-none">
+              {currentIdx >= 0 ? `${currentIdx + 1}/${totalCount}` : `-/${totalCount}`}
+            </span>
+            <button
+              onClick={handleSonraki}
+              disabled={filtrelenmisPersoneller.length <= 1}
+              title="Sonraki Personel"
+              className="px-1.5 py-0.5 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 text-[10px] font-bold cursor-pointer"
+            >
+              ▶
+            </button>
+          </div>
         </div>
 
-        {/* BÜYÜK PERSONEL NO VE SICIL NO KARTLARI */}
-        <div className="flex items-center gap-2.5">
+        {/* SAĞ: PERSONEL NO VE SİCİL NO (1100 Sabiti Kaldırıldı - Madde 2) */}
+        <div className="flex items-center gap-2">
           {/* Personel No */}
-          <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded border border-slate-300 shadow-2xs">
-            <span className="text-xs font-bold text-slate-600 whitespace-nowrap">Personel No</span>
+          <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded border border-slate-300 shadow-2xs">
+            <span className="text-[11px] font-bold text-slate-600 whitespace-nowrap">Personel No</span>
             <input
               id="input-personel-no"
               type="text"
               disabled={!duzenlemeModu}
               value={formData.personelNo || ''}
               onChange={(e) => handleInputChange('personelNo', e.target.value)}
-              placeholder="P-1001"
-              className={`border rounded px-2 py-0.5 text-base font-black tracking-wider w-[110px] text-center font-mono ${
+              placeholder="Örn: 10452"
+              className={`border rounded px-1.5 py-0.5 text-xs font-bold w-[80px] text-center font-mono ${
                 duzenlemeModu
-                  ? 'bg-white border-slate-300 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500/20 text-purple-900'
+                  ? 'bg-white border-slate-300 focus:border-blue-600 text-purple-900'
                   : 'bg-[#f0ede1] border-[#c0bdb2] text-purple-950 cursor-not-allowed'
               }`}
             />
           </div>
 
           {/* Sicil No */}
-          <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded border border-slate-300 shadow-2xs">
-            <span className="text-xs font-bold text-slate-600 whitespace-nowrap">Sicil No</span>
+          <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded border border-slate-300 shadow-2xs">
+            <span className="text-[11px] font-bold text-slate-600 whitespace-nowrap">Sicil No</span>
             <input
               id="input-sicil-no"
               type="text"
@@ -643,9 +612,9 @@ export function TcddPersonelFormu({
               value={formData.sicilNo || ''}
               onChange={(e) => handleInputChange('sicilNo', e.target.value)}
               placeholder="4315073"
-              className={`border rounded px-2 py-0.5 text-base font-black tracking-wider w-[115px] text-center font-mono ${
+              className={`border rounded px-1.5 py-0.5 text-xs font-black tracking-wider w-[85px] text-center font-mono ${
                 duzenlemeModu
-                  ? 'bg-white border-slate-300 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500/20 text-blue-900'
+                  ? 'bg-white border-slate-300 focus:border-blue-600 text-blue-900'
                   : 'bg-[#f0ede1] border-[#c0bdb2] text-blue-950 cursor-not-allowed'
               }`}
             />
@@ -653,168 +622,19 @@ export function TcddPersonelFormu({
         </div>
       </div>
 
-      {/* 3. MAIN BODY CONTAINER */}
-      <div className="flex-1 overflow-auto p-3 flex gap-3 min-h-0 bg-slate-100">
-        {/* LEFT COLUMN: KAYITLI PERSONEL LISTESİ */}
-        <div className="w-[320px] shrink-0 flex flex-col bg-white border border-slate-300 rounded shadow-xs overflow-hidden">
-          <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex items-center justify-between">
-            <span className="font-bold text-slate-800 text-xs">
-              {aktifGrup === 'MEMUR' ? 'Memur Personel Listesi' : 'İşçi Personel Listesi'}
-            </span>
-            <span className="text-[11px] text-slate-500 font-semibold bg-white px-2 py-0.5 rounded border border-slate-200">
-              {gruptakiPersoneller.length} Kişi
-            </span>
-          </div>
-
-          {/* HIZLI ARAMA */}
-          <div className="p-2 border-b border-slate-200 bg-white flex items-center gap-1.5">
-            <input
-              type="text"
-              placeholder="İsim veya Sicil No ile filtrele..."
-              value={aramaMetni}
-              onChange={(e) => setAramaMetni(e.target.value)}
-              className="flex-1 bg-slate-50 border border-slate-300 focus:bg-white focus:outline-none focus:border-blue-600 rounded px-2 py-1 text-xs"
-            />
-            {aramaMetni && (
-              <button
-                onClick={() => setAramaMetni('')}
-                className="text-xs text-slate-400 hover:text-slate-700 px-1"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* DATAGRID TABLE */}
-          <div className="flex-1 overflow-auto bg-white min-h-[220px]">
-            <table className="w-full text-left border-collapse text-[11px]">
-              <thead className="bg-slate-100 sticky top-0 border-b border-slate-200 shadow-2xs">
-                <tr>
-                  <th className="w-6 p-1 text-center font-bold text-slate-600 border-r border-slate-200">#</th>
-                  <th className="p-1.5 font-bold border-r border-slate-200 text-slate-700">Sicil</th>
-                  <th className="p-1.5 font-bold text-slate-700">Adı Soyadı</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtrelenmisPersoneller.map((p, idx) => {
-                  const isSelected = p.id === seciliId;
-                  return (
-                    <tr
-                      key={p.id}
-                      onClick={() => handlePersonelSecimi(p)}
-                      className={`cursor-pointer border-b border-slate-100 transition-colors ${
-                        isSelected
-                          ? 'bg-blue-600 text-white font-medium shadow-inner'
-                          : 'hover:bg-blue-50 text-slate-900 even:bg-slate-50/60'
-                      }`}
-                    >
-                      <td className={`w-6 text-center p-1 border-r text-[10px] font-mono ${isSelected ? 'border-blue-500 text-blue-100' : 'border-slate-200 text-slate-500'}`}>
-                        {idx + 1}
-                      </td>
-                      <td className={`p-1.5 border-r whitespace-nowrap font-mono text-xs font-semibold ${isSelected ? 'border-blue-500 text-white' : 'border-slate-200 text-slate-800'}`}>
-                        {p.sicilNo || '-'}
-                      </td>
-                      <td className="p-1.5 whitespace-nowrap">
-                        <span className={isSelected ? 'text-white font-medium' : 'text-slate-900 font-medium'}>{p.ad}</span>{' '}
-                        <span className={`font-bold ${isSelected ? 'text-white' : 'text-slate-900'}`}>{p.soyad}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filtrelenmisPersoneller.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="text-center py-8 text-slate-400 italic">
-                      Kayıt bulunamadı.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* SEARCH & FILTER CONTROLS */}
-          <div className="mt-2 pt-2 border-t border-[#d4d0c8] flex flex-col gap-1.5">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap">Personel Ara:</span>
-              <input
-                type="text"
-                value={aramaMetni}
-                onChange={(e) => setAramaMetni(e.target.value)}
-                placeholder="Arama..."
-                className="flex-1 bg-white border border-[#7f9db9] px-2 py-0.5 text-xs text-black focus:outline-none focus:border-blue-700"
-              />
-              <button
-                onClick={handleBilgileriGetir}
-                title="Ara"
-                className="bg-[#e1dfd6] hover:bg-[#d5d2c6] active:bg-[#c8c5b8] border border-[#7f9db9] px-2 py-0.5 text-[11px] font-medium text-gray-900 shadow-xs cursor-pointer"
-              >
-                Ara
-              </button>
-              <button
-                onClick={() => setAramaMetni('')}
-                title="Yenile / Temizle"
-                className="bg-[#e1dfd6] hover:bg-[#d5d2c6] active:bg-[#c8c5b8] border border-[#7f9db9] px-2 py-0.5 text-[11px] font-medium text-gray-900 shadow-xs cursor-pointer flex items-center gap-0.5"
-              >
-                <RotateCw className="w-3 h-3 text-gray-700" />
-                <span>Yenile</span>
-              </button>
-            </div>
-
-            {/* RADIO BUTTONS */}
-            <div className="flex items-center justify-between text-[10.5px] text-gray-800 pt-0.5">
-              <label className="flex items-center gap-1 cursor-pointer">
-                <input
-                  type="radio"
-                  name="aramaKriteri"
-                  checked={aramaTuru === 'tcKimlik'}
-                  onChange={() => setAramaTuru('tcKimlik')}
-                  className="cursor-pointer"
-                />
-                <span>TC Kimlik No</span>
-              </label>
-              <label className="flex items-center gap-1 cursor-pointer">
-                <input
-                  type="radio"
-                  name="aramaKriteri"
-                  checked={aramaTuru === 'ad'}
-                  onChange={() => setAramaTuru('ad')}
-                  className="cursor-pointer"
-                />
-                <span>Ad</span>
-              </label>
-              <label className="flex items-center gap-1 cursor-pointer">
-                <input
-                  type="radio"
-                  name="aramaKriteri"
-                  checked={aramaTuru === 'soyad'}
-                  onChange={() => setAramaTuru('soyad')}
-                  className="cursor-pointer"
-                />
-                <span>Soyad</span>
-              </label>
-            </div>
-
-            {/* BILGILERI GETIR BUTTON */}
-            <button
-              onClick={handleBilgileriGetir}
-              className="mt-1 bg-[#ece9d8] hover:bg-[#e0ded3] active:bg-[#d0cebf] border-2 border-outset border-[#7f9db9] py-1 px-3 text-[11px] font-bold text-gray-900 flex items-center justify-center gap-1 shadow-xs cursor-pointer"
-            >
-              <span>Bilgileri Getir</span>
-              <span className="text-black font-extrabold">▶</span>
-            </button>
-          </div>
-        </div>
+      {/* 3. MAIN BODY CONTAINER - Sığdırılmış, Yatay Kaydırma Çubuğu Olmayan Düzen */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-2.5 flex flex-col lg:flex-row gap-2 min-h-0 bg-slate-100 w-full">
 
         {/* MIDDLE COLUMN: FORM FIELDS */}
-        <div className="flex-1 flex flex-col gap-3 overflow-auto">
+        <div className="flex-1 flex flex-col gap-2 min-w-0">
           {/* GROUP 1: PERSONEL GENEL BILGILERI */}
-          <fieldset className="border border-[#7f9db9] p-2.5 bg-[#fbfaf6] shadow-xs">
+          <fieldset className="border border-[#7f9db9] p-2 bg-[#fbfaf6] shadow-xs">
             <legend className="px-1 text-[11px] font-bold text-gray-700">
               Personel Genel Bilgileri
             </legend>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 mt-0.5">
               <div className="flex items-center">
-                <label className="w-28 text-[11px] text-gray-800 font-medium shrink-0">
+                <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
                   TC Kimlik No <span className="text-red-600">*</span>
                 </label>
                 <input
@@ -847,7 +667,7 @@ export function TcddPersonelFormu({
               </div>
 
               <div className="flex items-center">
-                <label className="w-28 text-[11px] text-gray-800 font-medium shrink-0">
+                <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
                   Adı <span className="text-red-600">*</span>
                 </label>
                 <input
@@ -877,14 +697,14 @@ export function TcddPersonelFormu({
               </div>
 
               <div className="flex items-center">
-                <label className="w-28 text-[11px] text-gray-800 font-medium shrink-0">
+                <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
                   Soyadı <span className="text-red-600">*</span>
                 </label>
                 <input
                   type="text"
                   disabled={!duzenlemeModu}
                   value={formData.soyad}
-                  onChange={(e) => handleInputChange('soyad', e.target.value)}
+                  onChange={(e) => handleInputChange('soyad', e.target.value.toLocaleUpperCase('tr-TR'))}
                   className={`flex-1 border px-2 py-0.5 text-xs text-black uppercase font-medium ${
                     duzenlemeModu ? 'bg-white border-[#7f9db9]' : 'bg-[#f0ede1] border-[#c0bdb2]'
                   }`}
@@ -899,8 +719,9 @@ export function TcddPersonelFormu({
                   <input
                     type="text"
                     disabled={!duzenlemeModu}
-                    value={formData.dogumTarihi}
-                    onChange={(e) => handleInputChange('dogumTarihi', e.target.value)}
+                    placeholder="dd.mm.yyyy"
+                    value={formData.dogumTarihi || ''}
+                    onChange={(e) => handleInputChange('dogumTarihi', formatDateInput(e.target.value))}
                     className={`w-full border px-2 py-0.5 text-xs text-black pr-6 ${
                       duzenlemeModu ? 'bg-white border-[#7f9db9]' : 'bg-[#f0ede1] border-[#c0bdb2]'
                     }`}
@@ -909,19 +730,19 @@ export function TcddPersonelFormu({
                 </div>
               </div>
             </div>
-            <div className="text-[10px] text-gray-500 italic mt-1.5">
+            <div className="text-[10px] text-gray-500 italic mt-1">
               * işaretli alanlar doldurulması zorunlu bilgilerdir.
             </div>
           </fieldset>
 
           {/* GROUP 2: PERSONEL AİLE VE EĞİTİM BİLGİLERİ */}
-          <fieldset className="border border-[#7f9db9] p-2.5 bg-[#fbfaf6] shadow-xs">
+          <fieldset className="border border-[#7f9db9] p-2 bg-[#fbfaf6] shadow-xs">
             <legend className="px-1 text-[11px] font-bold text-gray-700">
               Personel Aile ve Eğitim Bilgileri
             </legend>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 mt-0.5">
               <div className="flex items-center">
-                <label className="w-28 text-[11px] text-gray-800 font-medium shrink-0">
+                <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
                   Medeni Hali
                 </label>
                 <select
@@ -956,7 +777,7 @@ export function TcddPersonelFormu({
 
               {/* Bitirdiği Okul - Açılır Seçim Listesi */}
               <div className="flex items-center">
-                <label className="w-28 text-[11px] text-gray-800 font-medium shrink-0">
+                <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
                   Bitirdiği Okul
                 </label>
                 <select
@@ -980,7 +801,7 @@ export function TcddPersonelFormu({
                 </select>
               </div>
 
-              {/* Bölümü - Dinamik Müfredat Seçimi / İlköğretimde Pasif */}
+              {/* Bölümü - Dinamik Müfredat Seçimi / İlköğretimde Pasif (Harf Sırasına Göre - Madde 4) */}
               <div className="flex items-center">
                 <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
                   Bölümü
@@ -1056,21 +877,22 @@ export function TcddPersonelFormu({
           </fieldset>
 
           {/* GROUP 3: PERSONEL İŞ BİLGİLERİ */}
-          <fieldset className="border border-[#7f9db9] p-2.5 bg-[#fbfaf6] shadow-xs">
+          <fieldset className="border border-[#7f9db9] p-2 bg-[#fbfaf6] shadow-xs">
             <legend className="px-1 text-[11px] font-bold text-gray-700">
               Personel İş Bilgileri
             </legend>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 mt-0.5">
               <div className="flex items-center">
-                <label className="w-28 text-[11px] text-gray-800 font-medium shrink-0">
+                <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
                   İşe Giriş Tarihi
                 </label>
                 <div className="flex-1 relative flex items-center">
                   <input
                     type="text"
                     disabled={!duzenlemeModu}
-                    value={formData.iseGirisTarihi}
-                    onChange={(e) => handleInputChange('iseGirisTarihi', e.target.value)}
+                    placeholder="dd.mm.yyyy"
+                    value={formData.iseGirisTarihi || ''}
+                    onChange={(e) => handleInputChange('iseGirisTarihi', formatDateInput(e.target.value))}
                     className={`w-full border px-2 py-0.5 text-xs text-black pr-6 ${
                       duzenlemeModu ? 'bg-white border-[#7f9db9]' : 'bg-[#f0ede1] border-[#c0bdb2]'
                     }`}
@@ -1094,145 +916,58 @@ export function TcddPersonelFormu({
                 />
               </div>
 
-              <div className="flex items-center">
-                <label className="w-28 text-[11px] text-gray-800 font-medium shrink-0">
-                  Sanat Kodu
-                </label>
-                <input
-                  type="text"
-                  disabled={!duzenlemeModu}
-                  value={formData.sanatKodu}
-                  onChange={(e) => handleInputChange('sanatKodu', e.target.value)}
-                  className={`flex-1 border px-2 py-0.5 text-xs text-black ${
-                    duzenlemeModu ? 'bg-white border-[#7f9db9]' : 'bg-[#f0ede1] border-[#c0bdb2]'
-                  }`}
-                />
-              </div>
-
-              <div className="flex items-center">
+              {/* 31. DÖNEM TİS BİRLEŞTİRİLMİŞ İŞ İSMİ AÇILIR LİSTESİ (Harf Sırasına Göre - Madde 4) */}
+              <div className="flex items-center col-span-1 sm:col-span-2">
                 <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
-                  Unvanı / Görev
+                  Sanat Kodu / İş İsmi
                 </label>
-                <input
-                  type="text"
+                <select
                   disabled={!duzenlemeModu}
-                  value={formData.unvan || ''}
-                  onChange={(e) => handleInputChange('unvan', e.target.value)}
-                  className={`flex-1 border px-2 py-0.5 text-xs text-black ${
-                    duzenlemeModu ? 'bg-white border-[#7f9db9]' : 'bg-[#f0ede1] border-[#c0bdb2]'
+                  value={formData.sanatKodu || ''}
+                  onChange={(e) => handleInputChange('sanatKodu', e.target.value)}
+                  className={`flex-1 border px-2 py-1 text-xs text-black ${
+                    duzenlemeModu ? 'bg-white border-[#7f9db9] font-medium' : 'bg-[#f0ede1] border-[#c0bdb2]'
                   }`}
-                />
+                >
+                  <option value="">-- 31. Dönem TİS Birleştirilmiş İş İsmi Seçiniz --</option>
+                  {formData.sanatKodu && !TIS_31_BIRLESTIRILMIS_IS_ISIMLERI.includes(formData.sanatKodu as any) && (
+                    <option value={formData.sanatKodu}>{formData.sanatKodu} (Mevcut)</option>
+                  )}
+                  {TIS_31_BIRLESTIRILMIS_IS_ISIMLERI.map((isIsmi) => (
+                    <option key={isIsmi} value={isIsmi}>
+                      {isIsmi}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </fieldset>
-        </div>
 
-        {/* RIGHT COLUMN: FOTO, İLETİŞİM, EĞİTİM & KURSLAR */}
-        <div className="w-[340px] shrink-0 flex flex-col gap-2.5">
-          {/* TOP RIGHT: FOTOĞRAF VE BUTONLAR */}
-          <div className="flex gap-2.5 items-start">
-            {/* FOTO KUTUSU */}
-            <div className="w-[120px] h-[135px] shrink-0 bg-white border-2 border-[#7f9db9] shadow-inner relative flex items-center justify-center overflow-hidden">
-              {formData.fotografUrl ? (
-                <img
-                  src={formData.fotografUrl}
-                  alt={`${formData.ad} ${formData.soyad}`}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover object-top"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center text-gray-400 p-2 text-center">
-                  <Camera className="w-8 h-8 text-gray-300 mb-1" />
-                  <span className="text-[10px]">Fotoğraf Yok</span>
-                </div>
-              )}
-            </div>
-
-            {/* YAN BUTONLAR */}
-            <div className="flex-1 flex flex-col gap-1.5 pt-0.5">
-              <button
-                onClick={() => setEvrakModalOpen(true)}
-                className="bg-[#ece9d8] hover:bg-[#dfdbcb] active:bg-[#cfcbba] border border-[#7f9db9] px-2 py-1.5 text-[11px] font-semibold text-gray-900 shadow-xs flex items-center gap-1.5 cursor-pointer text-left"
-              >
-                <FolderOpen className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="leading-tight">Evrak ve Belgeler ({formData.evraklar?.length || 0})</span>
-              </button>
-
-              <button
-                disabled={!duzenlemeModu}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border px-2 py-1.5 text-[11px] font-semibold shadow-xs flex items-center gap-1.5 text-left ${
-                  duzenlemeModu
-                    ? 'bg-[#ece9d8] hover:bg-[#dfdbcb] active:bg-[#cfcbba] border-[#7f9db9] text-gray-900 cursor-pointer'
-                    : 'bg-[#f0ede1] border-[#c0bdb2] text-gray-400 cursor-not-allowed opacity-60'
-                }`}
-                title={duzenlemeModu ? 'Fotoğraf yükle' : 'Fotoğraf eklemek için önce Düzenle butonuna basınız'}
-              >
-                <Camera className={`w-4 h-4 shrink-0 ${duzenlemeModu ? 'text-blue-600' : 'text-gray-400'}`} />
-                <span className="leading-tight">Fotoğraf Ekle</span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFotoUpload}
-                className="hidden"
-              />
-
-              <button
-                disabled={!duzenlemeModu || !formData.fotografUrl}
-                onClick={handleFotoSil}
-                className={`border px-2 py-1.5 text-[11px] font-semibold shadow-xs flex items-center gap-1.5 text-left ${
-                  duzenlemeModu && formData.fotografUrl
-                    ? 'bg-[#ece9d8] hover:bg-[#dfdbcb] active:bg-[#cfcbba] border-[#7f9db9] text-gray-900 cursor-pointer'
-                    : 'bg-[#f0ede1] border-[#c0bdb2] text-gray-400 cursor-not-allowed opacity-60'
-                }`}
-                title={duzenlemeModu ? 'Fotoğrafı sil' : 'Fotoğraf silmek için önce Düzenle butonuna basınız'}
-              >
-                <XCircle className={`w-4 h-4 shrink-0 ${duzenlemeModu && formData.fotografUrl ? 'text-red-600' : 'text-gray-400'}`} />
-                <span className="leading-tight">Fotoğrafı Sil</span>
-              </button>
-            </div>
-          </div>
-
-          {/* MIDDLE & BOTTOM RIGHT: İLETİŞİM VE İKAMETGAH BİLGİLERİ */}
-          <fieldset className="flex-1 border border-[#7f9db9] p-2.5 bg-[#fbfaf6] shadow-xs flex flex-col justify-between">
+          {/* GROUP 4: PERSONEL İLETİŞİM & ADRES BİLGİLERİ (İş Bilgilerinin Altına Taşındı) */}
+          <fieldset className="border border-[#7f9db9] p-2 bg-[#fbfaf6] shadow-xs">
             <legend className="px-1 text-[11px] font-bold text-gray-700">
-              Personel İletişim &amp; Adres Bilgileri
+              Personel İletişim ve Adres Bilgileri
             </legend>
-            <div className="flex flex-col gap-2 mt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 mt-0.5">
+              {/* TELEFON: 10 HANE, ... ... .. .. FORMATINDA */}
               <div className="flex items-center">
                 <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
                   Cep Telefonu
                 </label>
                 <input
                   type="text"
+                  maxLength={13}
                   disabled={!duzenlemeModu}
-                  value={formData.cepTelefonu}
-                  onChange={(e) => handleInputChange('cepTelefonu', e.target.value)}
-                  placeholder="(5XX) XXX XX XX"
-                  className={`flex-1 border px-2 py-0.5 text-xs text-black ${
+                  value={formData.cepTelefonu || ''}
+                  onChange={(e) => handleInputChange('cepTelefonu', formatPhoneNumber(e.target.value))}
+                  placeholder="5XX XXX XX XX"
+                  className={`flex-1 border px-2 py-0.5 text-xs text-black font-mono ${
                     duzenlemeModu ? 'bg-white border-[#7f9db9]' : 'bg-[#f0ede1] border-[#c0bdb2]'
                   }`}
                 />
               </div>
 
-              <div className="flex items-center">
-                <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
-                  E-Posta
-                </label>
-                <input
-                  type="text"
-                  disabled={!duzenlemeModu}
-                  value={formData.email || ''}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="ornek@tcdd.gov.tr"
-                  className={`flex-1 border px-2 py-0.5 text-xs text-black ${
-                    duzenlemeModu ? 'bg-white border-[#7f9db9]' : 'bg-[#f0ede1] border-[#c0bdb2]'
-                  }`}
-                />
-              </div>
-
+              {/* Şehir / İlçe */}
               <div className="flex items-center">
                 <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
                   Şehir / İlçe
@@ -1249,34 +984,152 @@ export function TcddPersonelFormu({
                 />
               </div>
 
-              <div className="flex items-start">
-                <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0 pt-1">
+              {/* E-POSTA: @tcddtasimacilik.gov.tr SABİT, BOŞSA OTOMATİK İSİMSOYİSİM */}
+              <div className="flex items-center col-span-1 sm:col-span-2">
+                <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0">
+                  E-Posta
+                </label>
+                <div className="flex-1 flex items-center">
+                  <input
+                    type="text"
+                    disabled={!duzenlemeModu}
+                    value={
+                      formData.email?.endsWith('@tcddtasimacilik.gov.tr')
+                        ? formData.email.replace('@tcddtasimacilik.gov.tr', '')
+                        : (formData.email || '')
+                    }
+                    onChange={(e) => {
+                      const prefix = e.target.value.replace(/@.*$/, '').trim();
+                      handleInputChange('email', prefix ? `${prefix}@tcddtasimacilik.gov.tr` : '');
+                    }}
+                    placeholder="isimsoyisim (otomatik)"
+                    className={`flex-1 border px-2 py-0.5 text-xs text-black ${
+                      duzenlemeModu ? 'bg-white border-[#7f9db9]' : 'bg-[#f0ede1] border-[#c0bdb2]'
+                    }`}
+                  />
+                  <span className="bg-slate-100 border-y border-r border-slate-300 px-2 py-0.5 text-xs font-semibold text-slate-700 select-none whitespace-nowrap">
+                    @tcddtasimacilik.gov.tr
+                  </span>
+                </div>
+              </div>
+
+              {/* İKAMET ADRESİ */}
+              <div className="flex items-start col-span-1 sm:col-span-2">
+                <label className="w-24 text-[11px] text-gray-800 font-medium shrink-0 pt-0.5">
                   İkamet Adresi
                 </label>
                 <textarea
-                  rows={4}
+                  rows={2}
                   disabled={!duzenlemeModu}
                   value={formData.adres}
                   onChange={(e) => handleInputChange('adres', e.target.value)}
                   placeholder="Açık ikametgah adresi..."
-                  className={`flex-1 border px-2 py-1 text-xs text-black resize-none ${
+                  className={`flex-1 border px-2 py-0.5 text-xs text-black resize-none ${
                     duzenlemeModu ? 'bg-white border-[#7f9db9]' : 'bg-[#f0ede1] border-[#c0bdb2]'
                   }`}
                 />
               </div>
             </div>
+          </fieldset>
+        </div>
+
+        {/* RIGHT COLUMN: SADECE FOTOĞRAF VE EVRAK BÖLÜMÜ */}
+        <div className="w-full lg:w-[260px] xl:w-[280px] shrink-0 flex flex-col gap-2">
+          <fieldset className="border border-[#7f9db9] p-3 bg-[#fbfaf6] shadow-xs flex flex-col items-center">
+            <legend className="px-1 text-[11px] font-bold text-gray-700">
+              Personel Fotoğrafı
+            </legend>
+
+            {/* FOTO KUTUSU - TAM KARE (SQUARE) */}
+            <div
+              onClick={() => {
+                if (formData.fotografUrl) setFotoBuyutModalOpen(true);
+              }}
+              title={formData.fotografUrl ? 'Fotoğrafı büyütmek için tıklayınız' : undefined}
+              className={`w-36 h-36 sm:w-44 sm:h-44 aspect-square bg-white border-2 border-[#7f9db9] rounded shadow-xs relative flex items-center justify-center overflow-hidden my-1 ${
+                formData.fotografUrl ? 'cursor-pointer hover:ring-2 hover:ring-blue-500 group' : ''
+              }`}
+            >
+              {formData.fotografUrl ? (
+                <>
+                  <img
+                    src={formData.fotografUrl}
+                    alt={`${formData.ad} ${formData.soyad}`}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <Maximize2 className="w-6 h-6 text-white drop-shadow" />
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-gray-400 p-2 text-center select-none">
+                  <Camera className="w-10 h-10 text-gray-300 mb-1" />
+                  <span className="text-xs font-medium">Fotoğraf Yok</span>
+                </div>
+              )}
+            </div>
+
+            {/* FOTOĞRAF VE EVRAK BUTONLARI */}
+            <div className="w-full flex flex-col gap-1.5 mt-2">
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  disabled={!duzenlemeModu}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border px-2 py-1.5 text-xs font-semibold shadow-2xs flex items-center justify-center gap-1.5 rounded ${
+                    duzenlemeModu
+                      ? 'bg-[#ece9d8] hover:bg-[#dfdbcb] active:bg-[#cfcbba] border-[#7f9db9] text-gray-900 cursor-pointer'
+                      : 'bg-[#f0ede1] border-[#c0bdb2] text-gray-400 cursor-not-allowed opacity-60'
+                  }`}
+                  title={duzenlemeModu ? 'Fotoğraf yükle' : 'Fotoğraf eklemek için önce Düzenle butonuna basınız'}
+                >
+                  <Camera className={`w-3.5 h-3.5 shrink-0 ${duzenlemeModu ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <span>Fotoğraf Ekle</span>
+                </button>
+
+                <button
+                  disabled={!duzenlemeModu || !formData.fotografUrl}
+                  onClick={handleFotoSil}
+                  className={`border px-2 py-1.5 text-xs font-semibold shadow-2xs flex items-center justify-center gap-1.5 rounded ${
+                    duzenlemeModu && formData.fotografUrl
+                      ? 'bg-[#ece9d8] hover:bg-[#dfdbcb] active:bg-[#cfcbba] border-[#7f9db9] text-gray-900 cursor-pointer'
+                      : 'bg-[#f0ede1] border-[#c0bdb2] text-gray-400 cursor-not-allowed opacity-60'
+                  }`}
+                  title={duzenlemeModu ? 'Fotoğrafı sil' : 'Fotoğraf silmek için önce Düzenle butonuna basınız'}
+                >
+                  <XCircle className={`w-3.5 h-3.5 shrink-0 ${duzenlemeModu && formData.fotografUrl ? 'text-red-600' : 'text-gray-400'}`} />
+                  <span>Fotoğrafı Sil</span>
+                </button>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFotoUpload}
+                className="hidden"
+              />
+
+              <button
+                onClick={() => setEvrakModalOpen(true)}
+                className="w-full bg-[#ece9d8] hover:bg-[#dfdbcb] active:bg-[#cfcbba] border border-[#7f9db9] px-2 py-1.5 text-xs font-semibold text-gray-900 shadow-2xs flex items-center justify-center gap-1.5 rounded cursor-pointer"
+              >
+                <FolderOpen className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Evraklar ve Belgeler ({formData.evraklar?.length || 0})</span>
+              </button>
+            </div>
 
             {/* Evrak Özet Kutusu */}
-            <div className="mt-3 pt-2 border-t border-[#d4d0c8] bg-[#f5f3ec] p-2 border border-[#d8d4c8] flex items-center justify-between text-[11px]">
-              <div className="flex items-center gap-1.5 text-gray-700">
-                <FolderOpen className="w-4 h-4 text-amber-600" />
-                <span>Yüklü Evrak Sayısı: <b>{formData.evraklar?.length || 0} adet</b></span>
+            <div className="w-full mt-2.5 pt-2 border-t border-[#d4d0c8] flex items-center justify-between text-[11px] text-gray-600">
+              <div className="flex items-center gap-1">
+                <FolderOpen className="w-3.5 h-3.5 text-amber-600" />
+                <span>Yüklü Evrak: <b>{formData.evraklar?.length || 0} adet</b></span>
               </div>
               <button
                 onClick={() => setEvrakModalOpen(true)}
                 className="text-blue-700 hover:text-blue-900 font-semibold underline cursor-pointer"
               >
-                Görüntüle / Yönet
+                Yönet
               </button>
             </div>
           </fieldset>
@@ -1284,31 +1137,31 @@ export function TcddPersonelFormu({
       </div>
 
       {/* 4. BOTTOM ACTION TOOLBAR (RESMİ YAZDIR, DÜZENLE, GÜNCELLE, VAZGEÇ, YENİ EKLE, SİL) */}
-      <div className="bg-white border-t border-slate-300 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+      <div className="bg-white border-t border-slate-300 px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 shadow-xs">
         {/* SOL: RESMİ RAPOR & FORM KİLİT BİLGİSİ */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {onResmiYazdir && (
             <button
               onClick={() => onResmiYazdir(formData)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-semibold shadow-xs cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-semibold shadow-2xs cursor-pointer transition-colors"
             >
-              <Printer className="w-4 h-4 text-slate-300" />
+              <Printer className="w-3.5 h-3.5 text-slate-300" />
               <span>Resmi Rapor Yazdır / PDF</span>
             </button>
           )}
 
           {/* Form Kilit / Düzenleme Bilgi İpucu */}
           {!isNewRecord && (
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded">
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
               {duzenlemeModu ? (
                 <>
-                  <Unlock className="w-3.5 h-3.5 text-emerald-600" />
+                  <Unlock className="w-3 h-3 text-emerald-600" />
                   <span className="text-emerald-800 font-semibold">Düzenleme Modu Açık</span>
                   <span className="text-slate-400">• Değişiklikleri [Güncelle] ile kaydedin</span>
                 </>
               ) : (
                 <>
-                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <Lock className="w-3 h-3 text-amber-600" />
                   <span className="text-slate-700 font-medium">Form Korumalı (Pasif)</span>
                   <span className="text-slate-400">• Değiştirmek için <b>[Düzenle]</b> butonuna basınız</span>
                 </>
@@ -1506,6 +1359,48 @@ export function TcddPersonelFormu({
               <button
                 onClick={() => setEvrakModalOpen(false)}
                 className="bg-[#ece9d8] hover:bg-[#dfdbcb] border border-[#7f9db9] px-4 py-1 text-xs font-bold text-gray-900 shadow-xs cursor-pointer"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FOTOĞRAF BÜYÜTME MODALI (Madde 12) */}
+      {fotoBuyutModalOpen && formData.fotografUrl && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4 backdrop-blur-xs"
+          onClick={() => setFotoBuyutModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-2xl overflow-hidden max-w-lg w-full border border-slate-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between">
+              <div className="font-bold text-sm">
+                {formData.ad} {formData.soyad} — Personel Fotoğrafı
+              </div>
+              <button
+                onClick={() => setFotoBuyutModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 flex items-center justify-center bg-slate-950">
+              <img
+                src={formData.fotografUrl}
+                alt={`${formData.ad} ${formData.soyad}`}
+                referrerPolicy="no-referrer"
+                className="max-h-[70vh] w-auto object-contain rounded shadow"
+              />
+            </div>
+            <div className="bg-slate-100 px-4 py-2.5 flex items-center justify-between text-xs text-slate-600">
+              <span>Sicil No: <b className="text-slate-900 font-mono">{formData.sicilNo || '-'}</b></span>
+              <button
+                onClick={() => setFotoBuyutModalOpen(false)}
+                className="px-4 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded font-medium cursor-pointer"
               >
                 Kapat
               </button>

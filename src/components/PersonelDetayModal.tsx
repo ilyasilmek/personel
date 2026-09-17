@@ -79,7 +79,7 @@ export const PersonelDetayModal: React.FC<PersonelDetayModalProps> = ({
           <div className="text-center sm:text-left flex-1">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
               <h2 className="text-lg font-bold text-slate-900">
-                {personel.ad} {personel.soyad}
+                {personel.ad} <span className="uppercase">{personel.soyad?.toLocaleUpperCase('tr-TR')}</span>
               </h2>
               <span
                 className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${

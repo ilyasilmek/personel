@@ -1,9 +1,6 @@
 import React from 'react';
 import {
   Database,
-  FileSpreadsheet,
-  FileText,
-  Save,
   RefreshCw,
   Table,
   Printer,
@@ -23,10 +20,10 @@ interface NavigationRibbonProps {
   aktifGrup: PersonelTuru;
   onGrupDegistir: (grup: PersonelTuru) => void;
   onYeniPersonelEkle: () => void;
-  onExcelExport: () => void;
-  onPdfExport: () => void;
+  onExcelExport?: () => void;
+  onPdfExport?: () => void;
   onResmiYazdir: () => void;
-  onQuickBackup: () => void;
+  onQuickBackup?: () => void;
   onRefresh: () => void;
   isciSayisi: number;
   memurSayisi: number;
@@ -104,137 +101,97 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
         </div>
       </div>
 
-      {/* 2. EKRAN SEKMELERİ (Arama, Ekleme, Genel Liste, Form, Yedekleme) */}
-      <div className="flex items-center px-4 pt-1.5 space-x-1.5 border-b border-slate-200 bg-slate-50">
-        {/* Arama Ekranı */}
-        <button
-          id="nav-tab-arama"
-          onClick={() => setActiveTab('arama')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-t-lg flex items-center space-x-1.5 transition-all cursor-pointer border-t-2 ${
-            activeTab === 'arama'
-              ? 'bg-white text-blue-700 border-t-blue-600 border-x border-slate-200 -mb-[1px] shadow-xs'
-              : 'border-t-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Search className="w-3.5 h-3.5 text-blue-600" />
-          <span>Arama &amp; Sorgulama</span>
-        </button>
-
-        {/* Personel Ekle (Boş Form Modu) */}
-        <button
-          id="nav-tab-personel-ekle"
-          onClick={onYeniPersonelEkle}
-          className="px-3.5 py-2 text-xs font-bold rounded-t-lg flex items-center space-x-1.5 transition-all cursor-pointer text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100/70 border border-emerald-300/80 bg-emerald-50 shadow-xs"
-          title="Yeni personel eklemek için boş formu açın"
-        >
-          <UserPlus className="w-3.5 h-3.5 text-emerald-600" />
-          <span>+ Yeni Personel Ekle</span>
-        </button>
-
-        {/* Genel Liste */}
-        <button
-          id="nav-tab-genel-liste"
-          onClick={() => setActiveTab('genel_liste')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-t-lg flex items-center space-x-1.5 transition-all cursor-pointer border-t-2 ${
-            activeTab === 'genel_liste'
-              ? 'bg-white text-blue-700 border-t-blue-600 border-x border-slate-200 -mb-[1px] shadow-xs'
-              : 'border-t-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Table className="w-3.5 h-3.5 text-indigo-600" />
-          <span>Genel Liste (10 Sütun)</span>
-        </button>
-
-        {/* Personel Takip Formu */}
-        <button
-          id="nav-tab-tcdd-form"
-          onClick={() => setActiveTab('tcdd_form')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-t-lg flex items-center space-x-1.5 transition-all cursor-pointer border-t-2 ${
-            activeTab === 'tcdd_form'
-              ? 'bg-white text-blue-700 border-t-blue-600 border-x border-slate-200 -mb-[1px] shadow-xs'
-              : 'border-t-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <FolderOpen className="w-3.5 h-3.5 text-blue-700" />
-          <span>Personel Özlük Formu</span>
-        </button>
-
-        {/* Yedekle - Yükle */}
-        <button
-          id="nav-tab-yedekleme"
-          onClick={() => setActiveTab('yedekleme')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-t-lg flex items-center space-x-1.5 transition-all cursor-pointer border-t-2 ${
-            activeTab === 'yedekleme'
-              ? 'bg-white text-blue-700 border-t-blue-600 border-x border-slate-200 -mb-[1px] shadow-xs'
-              : 'border-t-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Database className="w-3.5 h-3.5 text-purple-600" />
-          <span>Yedekle - Yükle</span>
-        </button>
-      </div>
-
-      {/* 3. MODERN İŞLEM TOOLBARI */}
-      <div className="bg-white px-4 py-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 shadow-xs">
-        <div className="flex items-center space-x-2 flex-wrap gap-y-1.5">
-          {/* Resmi Yazdır / PDF Çıktısı */}
+      {/* 2. EKRAN SEKMELERİ (Arama, Ekleme, LİSTE, Form, Resmi Yazdır, Yedekleme) */}
+      <div className="flex items-center justify-between px-4 pt-2 border-b border-slate-200 bg-slate-100 flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* ARAMA */}
           <button
-            id="btn-resmi-yazdir"
+            id="nav-tab-arama"
+            onClick={() => setActiveTab('arama')}
+            className={`px-3.5 py-1.5 text-xs font-bold rounded-t-md flex items-center space-x-1.5 transition-all cursor-pointer border ${
+              activeTab === 'arama'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border-blue-200'
+            }`}
+          >
+            <Search className={`w-3.5 h-3.5 ${activeTab === 'arama' ? 'text-white' : 'text-blue-600'}`} />
+            <span>ARAMA</span>
+          </button>
+
+          {/* YENİ PERSONEL */}
+          <button
+            id="nav-tab-personel-ekle"
+            onClick={onYeniPersonelEkle}
+            className="px-3.5 py-1.5 text-xs font-bold rounded-t-md flex items-center space-x-1.5 transition-all cursor-pointer border bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border-emerald-300"
+            title="Yeni personel eklemek için boş formu açın"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-emerald-600" />
+            <span>YENİ PERSONEL</span>
+          </button>
+
+          {/* LİSTE */}
+          <button
+            id="nav-tab-genel-liste"
+            onClick={() => setActiveTab('genel_liste')}
+            className={`px-3.5 py-1.5 text-xs font-bold rounded-t-md flex items-center space-x-1.5 transition-all cursor-pointer border ${
+              activeTab === 'genel_liste'
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-indigo-50 text-indigo-900 hover:bg-indigo-100 border-indigo-200'
+            }`}
+          >
+            <Table className={`w-3.5 h-3.5 ${activeTab === 'genel_liste' ? 'text-white' : 'text-indigo-600'}`} />
+            <span>LİSTE</span>
+          </button>
+
+          {/* PERSONEL ÖZLÜK */}
+          <button
+            id="nav-tab-tcdd-form"
+            onClick={() => setActiveTab('tcdd_form')}
+            className={`px-3.5 py-1.5 text-xs font-bold rounded-t-md flex items-center space-x-1.5 transition-all cursor-pointer border ${
+              activeTab === 'tcdd_form'
+                ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border-amber-200'
+            }`}
+          >
+            <FolderOpen className={`w-3.5 h-3.5 ${activeTab === 'tcdd_form' ? 'text-white' : 'text-amber-700'}`} />
+            <span>PERSONEL ÖZLÜK</span>
+          </button>
+
+          {/* RESMİ YAZDIR / DÖKÜM (Üst Tab'a Taşındı - Madde 3) */}
+          <button
+            id="nav-tab-resmi-yazdir"
             onClick={onResmiYazdir}
-            title="Resmi TCDD Raporunu Görüntüle ve Yazdır"
-            className="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 cursor-pointer shadow-xs transition-colors"
+            className="px-3.5 py-1.5 text-xs font-bold rounded-t-md flex items-center space-x-1.5 transition-all cursor-pointer border bg-rose-50 text-rose-900 hover:bg-rose-100 border-rose-300 shadow-xs"
+            title="Resmi TCDD Raporunu ve Personel Dökümünü Görüntüle / Yazdır"
           >
-            <Printer className="w-3.5 h-3.5 text-blue-700" />
-            <span>Resmi Yazdır / Döküm</span>
+            <Printer className="w-3.5 h-3.5 text-rose-700" />
+            <span>RESMİ YAZDIR / DÖKÜM</span>
           </button>
 
-          {/* Dışa Aktarma Butonları */}
+          {/* YEDEKLE - YÜKLE */}
           <button
-            id="btn-excel-aktar"
-            onClick={onExcelExport}
-            title={`${aktifGrup === 'ISCI' ? 'İŞÇİ LİSTE' : 'MEMUR LİSTE'} Excel (.xlsx) İndir`}
-            className="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 cursor-pointer shadow-xs transition-colors"
+            id="nav-tab-yedekleme"
+            onClick={() => setActiveTab('yedekleme')}
+            className={`px-3.5 py-1.5 text-xs font-bold rounded-t-md flex items-center space-x-1.5 transition-all cursor-pointer border ${
+              activeTab === 'yedekleme'
+                ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                : 'bg-purple-50 text-purple-900 hover:bg-purple-100 border-purple-200'
+            }`}
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Excel'e Aktar (.xlsx)</span>
-          </button>
-
-          <button
-            id="btn-pdf-aktar"
-            onClick={onPdfExport}
-            title={`${aktifGrup === 'ISCI' ? 'İŞÇİ LİSTE' : 'MEMUR LİSTE'} PDF İndir`}
-            className="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 cursor-pointer shadow-xs transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5 text-rose-600" />
-            <span>PDF İndir</span>
-          </button>
-
-          <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block"></div>
-
-          {/* Hızlı Yedek Al */}
-          <button
-            id="btn-hizli-yedek"
-            onClick={() => {
-              setActiveTab('yedekleme');
-              onQuickBackup();
-            }}
-            title="Veritabanı Yedekleme ve Geri Yükleme"
-            className="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer shadow-xs transition-colors"
-          >
-            <Save className="w-3.5 h-3.5 text-amber-600" />
-            <span>Yedek Al / Yükle (.tcddbak)</span>
+            <Database className={`w-3.5 h-3.5 ${activeTab === 'yedekleme' ? 'text-white' : 'text-purple-600'}`} />
+            <span>YEDEKLE - YÜKLE</span>
           </button>
         </div>
 
-        {/* Sağ: Yenileme */}
-        <div className="flex items-center space-x-2">
+        {/* Sağ: Yenileme Butonu */}
+        <div className="flex items-center pb-1.5">
           <button
             id="btn-yenile"
             onClick={onRefresh}
             title="Verileri Merkezi Sunucu ile Yenile (F5)"
-            className="px-2.5 py-1.5 rounded-md text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-300 transition-colors text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="px-2.5 py-1 rounded-md text-slate-700 hover:text-slate-900 hover:bg-slate-200 border border-slate-300 transition-colors text-[11px] font-medium flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
+            <RefreshCw className="w-3 h-3 text-slate-600" />
             <span>Yenile (F5)</span>
           </button>
         </div>

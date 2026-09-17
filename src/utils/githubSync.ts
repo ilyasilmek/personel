@@ -126,12 +126,17 @@ export async function testGitHubConnection(cfg?: GitHubSyncConfig): Promise<{
     }
 
     const data = await res.json();
+    const defaultBranch = data.default_branch || 'main';
+
+    // Otomatik olarak reponun asıl varsayılan dalını (main/master) kaydet
+    saveGitHubConfig({ branch: defaultBranch });
+
     return {
       success: true,
-      message: `Bağlantı başarılı! Depo: ${data.full_name} (${data.private ? 'Özel / Private' : 'Açık / Public'})`,
+      message: `Bağlantı başarılı! Depo: ${data.full_name} (${data.private ? 'Özel / Private' : 'Açık / Public'}) - Dal: ${defaultBranch}`,
       repoDetails: {
         isPrivate: data.private,
-        defaultBranch: data.default_branch || 'main',
+        defaultBranch,
         fullName: data.full_name,
       },
     };
@@ -160,32 +165,99 @@ export async function fetchFromGitHub(cfg?: GitHubSyncConfig): Promise<{
     return { success: false, message: 'Geçersiz repo formatı.' };
   }
 
-  const branch = config.branch || 'main';
   const filePath = config.filePath || 'personel_veritabani.json';
+  const branch = config.branch;
 
   try {
-    const url = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${filePath}?ref=${branch}`;
-    const res = await fetch(url, {
+    const branchParam = branch ? `?ref=${encodeURIComponent(branch)}` : '';
+    let url = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${filePath}${branchParam}`;
+    let res = await fetch(url, {
       headers: {
         Authorization: `Bearer ${config.token.trim()}`,
         Accept: 'application/vnd.github.v3+json',
       },
     });
 
+    // Eğer belirtilen dalda 404 alındıysa, varsayılan dal ile bir kez daha dene
+    if (res.status === 404 && branchParam) {
+      const fallbackUrl = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${filePath}`;
+      const fallbackRes = await fetch(fallbackUrl, {
+        headers: {
+          Authorization: `Bearer ${config.token.trim()}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+      if (fallbackRes.ok || fallbackRes.status === 404) {
+        res = fallbackRes;
+      }
+    }
+
     if (res.status === 404) {
       return {
         success: true,
         isEmpty: true,
-        message: 'Depoda henüz veritabanı dosyası yok. İlk kayıtta otomatik oluşturulacak.',
+        message: 'Depoda henüz veritabanı dosyası yok. "GitHub\'a Şimdi Gönder (Push)" butonuna basarak ilk verinizi yükleyebilirsiniz.',
       };
     }
     if (!res.ok) {
-      return { success: false, message: `GitHub indirme hatası: HTTP ${res.status}` };
+      const errObj = await res.json().catch(() => ({}));
+      return { success: false, message: `GitHub indirme hatası: HTTP ${res.status} (${errObj?.message || 'Bilinmeyen hata'})` };
     }
 
     const fileData = await res.json();
-    const contentUtf8 = base64ToUtf8(fileData.content || '');
-    const parsedJson = JSON.parse(contentUtf8);
+
+    if (Array.isArray(fileData)) {
+      return { success: false, message: 'Belirtilen dosya yolu bir dizin (klasör) olarak görünüyor.' };
+    }
+
+    let contentUtf8 = '';
+
+    // 1. Base64 içerik kontrolü
+    if (fileData.content && typeof fileData.content === 'string') {
+      contentUtf8 = base64ToUtf8(fileData.content);
+    } else if (fileData.download_url) {
+      // 1MB üzeri dosyalarda veya içerik boş döndüğünde download_url'den ham metin çek
+      try {
+        const rawRes = await fetch(fileData.download_url, {
+          headers: {
+            Authorization: `Bearer ${config.token.trim()}`,
+          },
+        });
+        if (rawRes.ok) {
+          contentUtf8 = await rawRes.text();
+        }
+      } catch (dlErr) {
+        console.warn('download_url indirme uyarısı:', dlErr);
+      }
+    }
+
+    // Dosya boyutu 0 ise veya içerik tamamen boşsa (Unexpected end of JSON hatasını engelle)
+    if (!contentUtf8 || contentUtf8.trim() === '') {
+      if (fileData.sha) {
+        saveGitHubConfig({ lastSha: fileData.sha });
+      }
+      return {
+        success: true,
+        isEmpty: true,
+        sha: fileData.sha,
+        message: 'GitHub deposundaki veritabanı dosyası henüz boş. "GitHub\'a Şimdi Gönder (Push)" butonuna basarak mevcut listenizi yükleyebilirsiniz.',
+      };
+    }
+
+    // JSON ayrıştırmayı güvenli blok içine al
+    let parsedJson: any;
+    try {
+      parsedJson = JSON.parse(contentUtf8);
+    } catch (parseErr: any) {
+      if (fileData.sha) {
+        saveGitHubConfig({ lastSha: fileData.sha });
+      }
+      return {
+        success: false,
+        sha: fileData.sha,
+        message: `Depodaki dosya boş veya geçersiz JSON içeriyor (${parseErr?.message || 'Biçim hatası'}). "GitHub'a Şimdi Gönder (Push)" butonuna basarak güncel veritabanınızı depoya kaydedebilirsiniz.`,
+      };
+    }
 
     let personeller: Personel[] = [];
     if (Array.isArray(parsedJson)) {
@@ -229,15 +301,16 @@ export async function pushToGitHub(
     return { success: false, message: 'Geçersiz repo formatı.' };
   }
 
-  const branch = config.branch || 'main';
   const filePath = config.filePath || 'personel_veritabani.json';
+  const branch = config.branch;
 
   try {
-    // 1. Dosyanın güncel SHA'sını al (varsa)
+    // 1. Dosyanın güncel SHA'sını GitHub'dan anlık sorgula
     let currentSha = config.lastSha;
     try {
+      const branchParam = branch ? `?ref=${encodeURIComponent(branch)}` : '';
       const checkRes = await fetch(
-        `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${filePath}?ref=${branch}`,
+        `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${filePath}${branchParam}`,
         {
           headers: {
             Authorization: `Bearer ${config.token.trim()}`,
@@ -247,7 +320,9 @@ export async function pushToGitHub(
       );
       if (checkRes.ok) {
         const checkData = await checkRes.json();
-        currentSha = checkData.sha;
+        if (checkData && checkData.sha) {
+          currentSha = checkData.sha;
+        }
       }
     } catch {
       // Dosya yoksa veya kontrol başarısızsa devam et
@@ -266,13 +341,15 @@ export async function pushToGitHub(
     const body: Record<string, any> = {
       message: commitMessage || `TCDD Personel Veritabanı Güncelleme (${personeller.length} Personel) - ${new Date().toLocaleString('tr-TR')}`,
       content: contentBase64,
-      branch: branch,
     };
+    if (branch) {
+      body.branch = branch;
+    }
     if (currentSha) {
       body.sha = currentSha;
     }
 
-    const putRes = await fetch(
+    let putRes = await fetch(
       `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${filePath}`,
       {
         method: 'PUT',
@@ -285,11 +362,73 @@ export async function pushToGitHub(
       }
     );
 
+    // Eğer dal belirtilmişse ve "Reference does not exist" veya 404/422 döndüyse, dal belirtmeden (varsayılan dalda) tekrar dene
+    if (!putRes.ok && body.branch) {
+      const errClone = await putRes.clone().json().catch(() => ({}));
+      if (
+        putRes.status === 422 ||
+        putRes.status === 404 ||
+        errClone?.message?.includes('Reference does not exist') ||
+        errClone?.message?.includes('Branch not found')
+      ) {
+        const retryBody = { ...body };
+        delete retryBody.branch;
+        const retryRes = await fetch(
+          `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${filePath}`,
+          {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${config.token.trim()}`,
+              Accept: 'application/vnd.github.v3+json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(retryBody),
+          }
+        );
+        if (retryRes.ok) {
+          putRes = retryRes;
+        }
+      }
+    }
+
+    // 409 Conflict (SHA uyuşmazlığı): GitHub'daki en taze SHA'yı alıp tekrar dene
+    if (putRes.status === 409) {
+      try {
+        const refetchRes = await fetch(
+          `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${filePath}`,
+          {
+            headers: {
+              Authorization: `Bearer ${config.token.trim()}`,
+              Accept: 'application/vnd.github.v3+json',
+            },
+          }
+        );
+        if (refetchRes.ok) {
+          const freshData = await refetchRes.json();
+          if (freshData?.sha) {
+            body.sha = freshData.sha;
+            putRes = await fetch(
+              `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${filePath}`,
+              {
+                method: 'PUT',
+                headers: {
+                  Authorization: `Bearer ${config.token.trim()}`,
+                  Accept: 'application/vnd.github.v3+json',
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
+              }
+            );
+          }
+        }
+      } catch {}
+    }
+
     if (!putRes.ok) {
       const errJson = await putRes.json().catch(() => ({}));
       return {
         success: false,
-        message: `GitHub kaydetme hatası (HTTP ${putRes.status}): ${errJson?.message || 'Yazma izni eksik olabilir'}`,
+        message: `GitHub kaydetme hatası (HTTP ${putRes.status}): ${errJson?.message || 'Yazma izni eksik veya çakışma oluştu'}`,
       };
     }
 

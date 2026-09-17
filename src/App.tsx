@@ -82,6 +82,7 @@ export default function App() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportType, setReportType] = useState<'liste' | 'kart'>('liste');
   const [reportPersonnel, setReportPersonnel] = useState<Personel | undefined>();
+  const [reportPersonnelList, setReportPersonnelList] = useState<Personel[] | null>(null);
 
   const showToast = (mesaj: string) => {
     if (!bildirimlerAktif) return;
@@ -241,6 +242,7 @@ export default function App() {
     const secilenTur = kaydedilecek.personelTuru || aktifGrup;
     const kayit: Personel = {
       ...kaydedilecek,
+      soyad: kaydedilecek.soyad ? kaydedilecek.soyad.trim().toLocaleUpperCase('tr-TR') : '',
       personelTuru: secilenTur,
     };
 
@@ -323,8 +325,10 @@ export default function App() {
     if (tekPersonel) {
       setReportPersonnel(tekPersonel);
       setReportType('kart');
+      setReportPersonnelList([tekPersonel]);
     } else {
       setReportType('liste');
+      setReportPersonnelList(liste && liste.length > 0 ? liste : null);
     }
     setIsReportModalOpen(true);
   };
@@ -509,8 +513,15 @@ export default function App() {
       {/* Türkçe Karakter Destekli Resmi Raporlama & Yazdırma Modalı */}
       <PrintableReportModal
         isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
-        personeller={personeller.filter((p) => (p.personelTuru || 'ISCI') === aktifGrup)}
+        onClose={() => {
+          setIsReportModalOpen(false);
+          setReportPersonnelList(null);
+        }}
+        personeller={
+          reportPersonnelList
+            ? reportPersonnelList
+            : personeller.filter((p) => (p.personelTuru || 'ISCI') === aktifGrup)
+        }
         seciliPersonel={reportPersonnel}
         aktifGrup={aktifGrup}
         raporTuru={reportType}

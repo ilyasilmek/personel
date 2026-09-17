@@ -36,7 +36,7 @@ export const GenelListe: React.FC<GenelListeProps> = ({
   onYeniPersonelEkle,
 }) => {
   const [aramaMetni, setAramaMetni] = useState('');
-  const [sortField, setSortField] = useState<SortField>('sicilNo');
+  const [sortField, setSortField] = useState<SortField>('ad');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [seciliId, setSeciliId] = useState<string>(personeller[0]?.id || '');
 
@@ -69,6 +69,11 @@ export const GenelListe: React.FC<GenelListeProps> = ({
     // Sıralama
     if (sortField) {
       sonuc.sort((a, b) => {
+        if (sortField === 'ad') {
+          const comp = (a.ad || '').localeCompare(b.ad || '', 'tr-TR', { sensitivity: 'base' });
+          if (comp !== 0) return sortOrder === 'asc' ? comp : -comp;
+          return (a.soyad || '').localeCompare(b.soyad || '', 'tr-TR', { sensitivity: 'base' });
+        }
         let valA = '';
         let valB = '';
         if (sortField === 'unvan') {
@@ -331,8 +336,8 @@ export const GenelListe: React.FC<GenelListeProps> = ({
                       </td>
 
                       {/* SOYADI */}
-                      <td className={`p-1.5 border-r px-2 font-bold ${isSelected ? 'border-blue-400 text-white' : 'border-gray-300 text-gray-900'}`}>
-                        {p.soyad}
+                      <td className={`p-1.5 border-r px-2 font-bold uppercase ${isSelected ? 'border-blue-400 text-white' : 'border-gray-300 text-gray-900'}`}>
+                        {p.soyad ? p.soyad.toLocaleUpperCase('tr-TR') : ''}
                       </td>
 
                       {/* ÜNVANI */}

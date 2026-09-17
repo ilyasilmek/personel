@@ -305,9 +305,10 @@ export const PersonelAramaEkrani: React.FC<PersonelAramaEkraniProps> = ({
 
                         {/* Ad Soyad */}
                         <td className="p-2">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-bold text-[12.5px]">
-                              {p.ad} {p.soyad}
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-semibold text-[12.5px]">{p.ad}</span>
+                            <span className="font-bold uppercase text-[12.5px]">
+                              {p.soyad ? p.soyad.toLocaleUpperCase('tr-TR') : ''}
                             </span>
                           </div>
                         </td>

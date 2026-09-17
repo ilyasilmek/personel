@@ -366,7 +366,7 @@ export const PersonelListesi: React.FC<PersonelListesiProps> = ({
                           </div>
                           <div>
                             <span className="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">
-                              {p.ad} {p.soyad}
+                              {p.ad} <span className="uppercase">{p.soyad?.toLocaleUpperCase('tr-TR')}</span>
                             </span>
                             <span className="text-[10px] text-slate-400 block sm:hidden">
                               {p.pozisyon}
@@ -476,7 +476,7 @@ export const PersonelListesi: React.FC<PersonelListesiProps> = ({
                     </div>
                     <div>
                       <h4 className="font-semibold text-slate-800 text-sm leading-tight">
-                        {p.ad} {p.soyad}
+                        {p.ad} <span className="uppercase">{p.soyad?.toLocaleUpperCase('tr-TR')}</span>
                       </h4>
                       <p className="text-[11px] text-slate-500 font-mono">TC: {p.tcKimlik}</p>
                     </div>

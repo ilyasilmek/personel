@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Printer, Download, FileSpreadsheet } from 'lucide-react';
 import { Personel, PersonelTuru } from '../types';
-import { exportPersonnelToExcel, exportPersonnelToPdf } from '../utils/exportUtils';
+import { exportPersonnelToExcel, exportPersonnelToPdf, sortPersonellerByName } from '../utils/exportUtils';
 
 interface PrintableReportModalProps {
   isOpen: boolean;
@@ -22,6 +22,11 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
 
   const grupAdi = aktifGrup === 'MEMUR' ? 'MEMUR PERSONEL' : 'İŞÇİ PERSONEL';
 
+  // Döküm listesi her zaman isme (ve ardından soyisme) göre alfabetik sıralanır
+  const siraliPersoneller = useMemo(() => {
+    return sortPersonellerByName(personeller);
+  }, [personeller]);
+
   const handlePrint = () => {
     window.print();
   };
@@ -33,7 +38,7 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
         <div className="bg-[#0055ea] text-white px-3 py-2 flex items-center justify-between font-bold text-xs select-none print:hidden">
           <div className="flex items-center gap-2">
             <Printer className="w-4 h-4" />
-            <span>{grupAdi} - Resmi Çıktı &amp; Yazdırma Önizleme</span>
+            <span>{grupAdi} - Resmi Çıktı &amp; Yazdırma Önizleme (İsme Göre Sıralı)</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -44,7 +49,7 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
               <span>Yazdır / PDF Olarak Kaydet (Ctrl+P)</span>
             </button>
             <button
-              onClick={() => exportPersonnelToExcel(personeller, aktifGrup)}
+              onClick={() => exportPersonnelToExcel(siraliPersoneller, aktifGrup)}
               className="bg-emerald-800 hover:bg-emerald-900 text-white px-2.5 py-1 text-xs rounded-xs flex items-center gap-1 shadow-xs cursor-pointer"
               title="Excel İndir"
             >
@@ -52,7 +57,7 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
               <span>Excel</span>
             </button>
             <button
-              onClick={() => exportPersonnelToPdf(personeller, aktifGrup)}
+              onClick={() => exportPersonnelToPdf(siraliPersoneller, aktifGrup)}
               className="bg-blue-800 hover:bg-blue-900 text-white px-2.5 py-1 text-xs rounded-xs flex items-center gap-1 shadow-xs cursor-pointer"
               title="PDF İndir"
             >
@@ -99,7 +104,7 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {personeller.map((p, idx) => (
+                  {siraliPersoneller.map((p, idx) => (
                     <tr
                       key={p.id}
                       className={`border-b border-black ${idx % 2 === 1 ? 'bg-gray-50 print:bg-gray-50' : 'bg-white'}`}
@@ -116,8 +121,8 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
                       <td className="p-1.5 border-r border-black px-2 font-medium">
                         {p.ad}
                       </td>
-                      <td className="p-1.5 border-r border-black px-2 font-bold">
-                        {p.soyad}
+                      <td className="p-1.5 border-r border-black px-2 font-bold uppercase">
+                        {p.soyad ? p.soyad.toLocaleUpperCase('tr-TR') : ''}
                       </td>
                       <td className="p-1.5 border-r border-black px-2">
                         {p.unvan || p.sanatKodu}
@@ -142,7 +147,7 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
 
             {/* Alt Bilgi */}
             <div className="mt-4 pt-2 text-[10px] text-gray-500 flex justify-between items-center print:text-black">
-              <div>Toplam: <b>{personeller.length}</b> Personel</div>
+              <div>Toplam: <b>{siraliPersoneller.length}</b> Personel (A-Z Sıralı)</div>
               <div>Tarih: {new Date().toLocaleDateString('tr-TR')}</div>
             </div>
           </div>
