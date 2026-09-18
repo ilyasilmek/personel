@@ -92,6 +92,18 @@
           }
           origWarn.apply(console, args);
         };
+
+        // 3. Electron / file:// protocol compatibility
+        if (window.location && window.location.protocol === 'file:') {
+          try {
+            if ('serviceWorker' in window.navigator) {
+              Object.defineProperty(window.navigator, 'serviceWorker', {
+                value: undefined,
+                configurable: true,
+              });
+            }
+          } catch (e) {}
+        }
       })();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -102,8 +114,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Gebze Personel Takip" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <meta property="og:title" content="Gebze Vagon Bakım Atölye Müdürlüğü Personel Takip" />
     <meta property="og:description" content="Gebze Vagon Bakım Atölye Müdürlüğü Personel Takip, Özlük ve Sicil Yönetim Sistemi." />
     <meta property="og:type" content="website" />
